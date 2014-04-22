@@ -11,6 +11,14 @@ using namespace std;
 //----------------------------------------------------------------------------
 // Character Predicates
 
+struct is_any {
+    string const name = "anything";
+    is_any() {}
+    bool operator() (int const c) const {
+        return c != EOF;
+    }
+} const is_any;
+
 struct is_space {
     string const name = "space";
     is_space() {}
@@ -81,72 +89,39 @@ public:
 
 //----------------------------------------------------------------------------
 
-template <typename P1, typename P2> class is_either_tmp {
+template <typename P1, typename P2> class is_either {
     P1 const p1;
     P2 const p2;
 
 public:
     string const name;
-    is_either_tmp(P1&& p1, P2&& p2)
+    is_either(P1&& p1, P2&& p2)
         : p1(forward<P1>(p1)), p2(forward<P2>(p2)), name("(" + p1.name + " or " + p2.name + ")") {}
     bool operator() (int const c) const {
         return p1(c) || p2(c);
     }
 };
 
-template <typename P1, typename P2> class is_either_crf {
-    P1 const &p1;
-    P2 const &p2;
-
-public:
-    string const name;
-    is_either_crf(P1 const& p1, P2 const& p2)
-        : p1(p1), p2(p2), name("(" + p1.name + " or " + p2.name + ")") {}
-    bool operator() (int const c) const {
-        return p1(c) || p2(c);
-    }
-};
-
-template <typename P1, typename P2> is_either_tmp<P1, P2> const operator+ (P1&& p1, P2&& p2) {
-    return is_either_tmp<P1, P2>(forward<P1>(p1), forward<P2>(p2));
-}
-
-template <typename P1, typename P2> is_either_crf<P1, P2> const operator+ (P1 const& p1, P2 const& p2) {
-    return is_either_crf<P1, P2>(p1, p2);
+template <typename P1, typename P2> is_either<P1, P2> const operator+ (P1 p1, P2 p2) {
+    return is_either<P1, P2>(move(p1), move(p2));
 }
 
 //----------------------------------------------------------------------------
 
-template <typename P1> class is_not_tmp {
+template <typename P1> class is_not {
     P1 const p1;
 
 public:
     string const name;
-    explicit is_not_tmp(P1&& p1) 
+    explicit is_not(P1&& p1) 
         : p1(forward<P1>(p1)), name("~" + p1.name) {}
     bool operator() (int const c) const {
         return !p1(c);
     }
 };
 
-template <typename P1> class is_not_crf {
-    P1 const &p1;
-
-public:
-    string const name;
-    explicit is_not_crf(P1 const& p1) 
-        : p1(p1), name("~" + p1.name) {}
-    bool operator() (int const c) const {
-        return !p1(c);
-    }
-};
-
-template <typename P1> is_not_tmp<P1> const operator~ (P1&& p1) {
-    return is_not_tmp<P1>(forward<P1>(p1));
-}
-
-template <typename P1> is_not_crf<P1> const operator~ (P1 const& p1) {
-    return is_not_crf<P1>(p1);
+template <typename P1> is_not<P1> const operator~ (P1 p1) {
+    return is_not<P1>(move(p1));
 }
 
 //----------------------------------------------------------------------------
@@ -156,9 +131,9 @@ struct parse_error : public runtime_error {
     int const row;
     int const col;
     int const sym;
-    string const &exp;
-    parse_error(string const &what, int row, int col, string const &exp, int sym)
-        : runtime_error(what), row(row), col(col), exp(exp), sym(sym) {}
+    string const exp;
+    parse_error(string const what, int row, int col, string const exp, int sym)
+        : runtime_error(move(what)), row(row), col(col), exp(move(exp)), sym(sym) {}
 };
 
 class fparse {
@@ -179,7 +154,7 @@ public:
         if (sym == '\n') {
             ++row;
             col = 1;
-        } else {
+        } else if (::isprint(sym)) {
             ++col;
         }
     }
@@ -199,13 +174,13 @@ public:
 
 //----------------------------------------------------------------------------
     
-template <typename P> class p_accept_tmp {
+template <typename P> class p_accept {
     P const pred;
 
 public:
     typedef string value_type;
 
-    explicit p_accept_tmp(P&& p) : pred(forward<P>(p)) {}
+    explicit p_accept(P&& p) : pred(forward<P>(p)) {}
 
     bool operator() (fparse &p, value_type *v = nullptr) const {
         int const sym = p.get_sym();
@@ -220,44 +195,19 @@ public:
     }
 };
 
-template <typename P> class p_accept_crf {
-    P const &pred;
-
-public:
-    typedef string value_type;
-
-    explicit p_accept_crf(P const& p) : pred(p) {}
-
-    bool operator() (fparse &p, value_type *v = nullptr) const {
-        int const sym = p.get_sym();
-        if (!pred(sym)) {
-            return false;
-        }
-        if (v != nullptr) {
-            v->push_back(sym);
-        }
-        p.next();
-        return true;
-    }
-};
-
-template <typename P> const p_accept_tmp<P> accept(P&& p) {
-    return p_accept_tmp<P>(forward<P>(p));
-}
-
-template <typename P> const p_accept_crf<P> accept(P const& p) {
-    return p_accept_crf<P>(p);
+template <typename P> const p_accept<P> accept(P p) {
+    return p_accept<P>(move(p));
 }
 
 //----------------------------------------------------------------------------
 
-template <typename P> class p_expect_tmp {
+template <typename P> class p_expect {
     P const pred;
 
 public:
     typedef string value_type;
 
-    explicit p_expect_tmp(P&& p) : pred(forward<P>(p)) {}
+    explicit p_expect(P&& p) : pred(forward<P>(p)) {}
 
     bool operator() (fparse &p, value_type *v = nullptr) const {
         int const sym = p.get_sym();
@@ -272,44 +222,19 @@ public:
     }
 };
 
-template <typename P> class p_expect_crf {
-    P const &pred;
-
-public:
-    typedef string value_type;
-
-    explicit p_expect_crf(P const& p) : pred(p) {}
-
-    bool operator() (fparse &p, value_type *v = nullptr) const {
-        int const sym = p.get_sym();
-        if (!pred(sym)) {
-            p.error("expected", pred.name);   
-        }
-        if (v != nullptr) {
-            v->push_back(sym);
-        }
-        p.next();
-        return true;
-    }
-};
-
-template <typename P> const p_expect_tmp<P> expect(P&& p) {
-    return p_expect_tmp<P>(forward<P>(p));
-}
-
-template <typename P> const p_expect_crf<P> expect(P const& p) {
-    return p_expect_crf<P>(p);
+template <typename P> const p_expect<P> expect(P p) {
+    return p_expect<P>(move(p));
 }
 
 //----------------------------------------------------------------------------
 
-template <typename P1> class p_option_tmp {
+template <typename P1> class p_option {
     P1 const p1;
 
 public:
     typedef typename P1::value_type value_type;
 
-    explicit p_option_tmp(P1&& p1) : p1(forward<P1>(p1)) {}
+    explicit p_option(P1&& p1) : p1(forward<P1>(p1)) {}
 
     bool operator() (fparse &p, value_type *v = nullptr) const {
         bool const t = p1(p, v);
@@ -317,75 +242,19 @@ public:
     }
 };
 
-template <typename P1> class p_option_crf {
-    P1 const &p1;
-
-public:
-    typedef typename P1::value_type value_type;
-
-    explicit p_option_crf(P1 const& p1) : p1(p1) {}
-
-    bool operator() (fparse &p, value_type *v = nullptr) const {
-        bool const t = p1(p, v);
-        return true;
-    }
-};
-
-template <typename P1> const p_option_tmp<P1> option(P1&& p1) {
-    return p_option_tmp<P1>(forward<P1>(p1));
-}
-
-template <typename P1> const p_option_crf<P1> option(P1 const& p1) {
-    return p_option_crf<P1>(p1);
+template <typename P1> const p_option<P1> option(P1 p1) {
+    return p_option<P1>(move(p1));
 }
 
 //----------------------------------------------------------------------------
 
-template <typename P1> class p_many0_tmp {
+template <typename P1> class p_many {
     P1 const p1;
 
 public:
     typedef typename P1::value_type value_type;
 
-    explicit p_many0_tmp(P1&& p1) : p1(forward<P1>(p1)) {}
-
-    bool operator() (fparse &p, value_type *v = nullptr) const {
-        while(p1(p, v));
-        return true;
-    }
-}; 
-
-template <typename P1> class p_many0_crf {
-    P1 const &p1;
-
-public:
-    typedef typename P1::value_type value_type;
-
-    explicit p_many0_crf(P1 const& p1) : p1(p1) {}
-
-    bool operator() (fparse &p, value_type *v = nullptr) const {
-        while(p1(p, v));
-        return true;
-    }
-}; 
-
-template <typename P1> const p_many0_tmp<P1> many0(P1&& p1) {
-    return p_many0_tmp<P1>(forward<P1>(p1));
-}
-
-template <typename P1> const p_many0_crf<P1> many0(P1 const& p1) {
-    return p_many0_crf<P1>(p1);
-}
-
-//----------------------------------------------------------------------------
-
-template <typename P1> class p_many1_tmp {
-    P1 const p1;
-
-public:
-    typedef typename P1::value_type value_type;
-
-    explicit p_many1_tmp(P1&& p1) : p1(forward<P1>(p1)) {}
+    explicit p_many(P1&& p1) : p1(forward<P1>(p1)) {}
 
     bool operator() (fparse &p, value_type *v = nullptr) const {
         if (p1(p, v)) {
@@ -396,116 +265,83 @@ public:
     }
 };
 
-template <typename P1> class p_many1_crf {
-    P1 const &p1;
+template <typename P1> const p_many<P1> many(P1 p1) {
+    return p_many<P1>(move(p1));
+}
+
+//----------------------------------------------------------------------------
+
+template <typename P1, typename P2> class p_sepby {
+    P1 const p1;
+    P2 const p2;
 
 public:
     typedef typename P1::value_type value_type;
 
-    explicit p_many1_crf(P1 const& p1) : p1(p1) {}
+    explicit p_sepby(P1&& p1, P2&& p2) : p1(forward<P1>(p1)), p2(forward<P2>(p2)) {}
 
     bool operator() (fparse &p, value_type *v = nullptr) const {
         if (p1(p, v)) {
-            while (p1(p, v));
+            while(p2(p, nullptr) && p1(p, v));
             return true;
         }
         return false;
     }
-};
+}; 
 
-template <typename P1> const p_many1_tmp<P1> many1(P1&& p1) {
-    return p_many1_tmp<P1>(forward<P1>(p1));
-}
-
-template <typename P1> const p_many1_crf<P1> many1(P1 const& p1) {
-    return p_many1_crf<P1>(p1);
+template <typename P1, typename P2> const p_sepby<P1, P2> sepby(P1 p1, P2 p2) {
+    return p_sepby<P1, P2>(move(p1), move(p2));
 }
 
 //----------------------------------------------------------------------------
 
-template <typename P1, typename P2> class p_either_tmp { 
+template <typename P1, typename P2> class p_either { 
     P1 const p1;
     P2 const p2;
 
 public:
     typedef typename P1::value_type value_type;
 
-    p_either_tmp(P1&& p1, P2&& p2) : p1(forward<P1>(p1)), p2(forward<P2>(p2)) {}
+    p_either(P1&& p1, P2&& p2) : p1(forward<P1>(p1)), p2(forward<P2>(p2)) {}
 
     bool operator() (fparse &p, value_type *v = nullptr) const {
         return p1(p, v) || p2(p, v);
     }
 };
 
-template <typename P1, typename P2> class p_either_crf { 
-    P1 const &p1;
-    P2 const &p2;
-
-public:
-    typedef typename P1::value_type value_type;
-
-    p_either_crf(P1 const& p1, P2 const& p2) : p1(p1), p2(p2) {}
-
-    bool operator() (fparse &p, value_type *v = nullptr) const {
-        return p1(p, v) || p2(p, v);
-    }
-};
-
-template <typename P1, typename P2> const p_either_tmp<P1, P2> operator|| (P1&& p1, P2&& p2) {
-    return p_either_tmp<P1, P2>(forward<P1>(p1), forward<P2>(p2));
-}
-
-template <typename P1, typename P2> const p_either_crf<P1, P2> operator|| (P1 const& p1, P2 const& p2) {
-    return p_either_crf<P1, P2>(p1, p2);
+template <typename P1, typename P2> const p_either<P1, P2> operator|| (P1 p1, P2 p2) {
+    return p_either<P1, P2>(move(p1), move(p2));
 }
 
 //----------------------------------------------------------------------------
 
-template <typename P1, typename P2> class p_sequence_tmp {
+template <typename P1, typename P2> class p_sequence {
     P1 const p1;
     P2 const p2;
 
 public:
     typedef typename P1::value_type value_type;
 
-    p_sequence_tmp(P1&& p1, P2&& p2) : p1(forward<P1>(p1)), p2(forward<P2>(p2)) {}
+    p_sequence(P1&& p1, P2&& p2) : p1(forward<P1>(p1)), p2(forward<P2>(p2)) {}
 
     bool operator() (fparse &p, value_type *v = nullptr) const {
         return p1(p, v) && p2(p, v);
     }
 };
 
-template <typename P1, typename P2> class p_sequence_crf {
-    P1 const &p1;
-    P2 const &p2;
-
-public:
-    typedef typename P1::value_type value_type;
-
-    p_sequence_crf(P1 const& p1, P2 const& p2) : p1(p1), p2(p2) {}
-
-    bool operator() (fparse &p, value_type *v = nullptr) const {
-        return p1(p, v) && p2(p, v);
-    }
-};
-
-template <typename P1, typename P2> const p_sequence_tmp<P1, P2> operator&& (P1&& p1, P2&& p2) {
-    return p_sequence_tmp<P1, P2>(forward<P1>(p1), forward<P2>(p2));
-}
-
-template <typename P1, typename P2> const p_sequence_crf<P1, P2> operator&& (P1 const& p1, P2 const& p2) {
-    return p_sequence_crf<P1, P2>(p1, p2);
+template <typename P1, typename P2> const p_sequence<P1, P2> operator&& (P1 p1, P2 p2) {
+    return p_sequence<P1, P2>(move(p1), move(p2));
 }
 
 //----------------------------------------------------------------------------
 
-template <typename P1> class p_lift_vector_tmp {
+template <typename P1> class p_lift_vector {
     P1 const p1;
 
 public:
     typedef vector<typename P1::value_type> value_type;
 
-    p_lift_vector_tmp(P1&& p1) : p1(forward<P1>(p1)) {}
+    p_lift_vector(P1&& p1) : p1(forward<P1>(p1)) {}
 
     bool operator() (fparse &p, value_type *v = nullptr) const {
         if (v != nullptr) {
@@ -521,46 +357,25 @@ public:
     }
 };
 
-template <typename P1> class p_lift_vector_crf {
-    P1 const &p1;
-
-public:
-    typedef vector<typename P1::value_type> value_type;
-
-    p_lift_vector_crf(P1 const& p1) : p1(p1) {}
-
-    bool operator() (fparse &p, value_type *v = nullptr) const {
-        if (v != nullptr) {
-            typename P1::value_type v1;
-            if (p1(p, &v1)) {
-                v->push_back(move(v1));
-                return true;
-            }
-            return false;
-        } else {
-            return p1(p, nullptr);
-        }
-    }
-};
-
-template <typename P1> const p_lift_vector_tmp<P1> lift_vector(P1&& p1) {
-    return p_lift_vector_tmp<P1>(forward<P1>(p1));
-}
-
-template <typename P1> const p_lift_vector_crf<P1> lift_vector(P1 const& p1) {
-    return p_lift_vector_crf<P1>(p1);
+template <typename P1> const p_lift_vector<P1> lift_vector(P1 p1) {
+    return p_lift_vector<P1>(move(p1));
 }
 
 //----------------------------------------------------------------------------
 
 auto const is_minus = is_char('-');
-auto const p_int = option(accept(is_minus)) && many1(accept(is_digit));
+
+auto const space = many(accept(is_space));
+auto const number = many(accept(is_digit));
+auto const signed_number = option(accept(is_minus)) && number;
+auto const name = accept(is_alpha) && option(many(accept(is_alnum)));
 
 struct parse_int {
     typedef int value_type;
+    parse_int() {}
     bool operator() (fparse &p, value_type *i = nullptr) const {
         string s;
-        if (p_int(p, &s)) {
+        if (signed_number(p, &s)) {
             if (i != nullptr) {
                 *i = stoi(s);
             }
@@ -568,10 +383,5 @@ struct parse_int {
         }
         return false;
     }
-};
-
-auto const space = many1(accept(is_space));
-auto const number = many1(accept(is_digit));
-auto const signed_number = option(accept(is_minus)) && number;
-auto const name = accept(is_alpha) && many0(accept(is_alnum));
+} const parse_int;
 
