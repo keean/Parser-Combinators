@@ -113,8 +113,8 @@ public:
 };
 
 template <typename P1, typename P2,
-    typename enable_if<is_same<typename P1::is_predicate_type, true_type>::value, int>::type = 0,
-    typename enable_if<is_same<typename P2::is_predicate_type, true_type>::value, int>::type = 0>
+    typename = typename P1::is_predicate_type,
+    typename = typename P2::is_predicate_type>
 is_either<P1, P2> const operator|| (P1 p1, P2 p2) {
     return is_either<P1, P2>(move(p1), move(p2));
 }
@@ -135,7 +135,7 @@ public:
 };
 
 template <typename P1,
-    typename enable_if<is_same<typename P1::is_predicate_type, true_type>::value, int>::type = 0>
+    typename = typename P1::is_predicate_type>
 is_not<P1> const operator~ (P1 p1) {
     return is_not<P1>(move(p1));
 }
@@ -211,7 +211,8 @@ public:
     }
 };
 
-template <typename P> p_accept<P> const accept(P p) {
+template <typename P, typename = typename P::is_predicate_type>
+p_accept<P> const accept(P p) {
     return p_accept<P>(move(p));
 }
 
@@ -238,7 +239,8 @@ public:
     }
 };
 
-template <typename P> p_expect<P> const expect(P p) {
+template <typename P, typename = typename P::is_predicate_type>
+p_expect<P> const expect(P p) {
     return p_expect<P>(move(p));
 }
 
@@ -258,7 +260,8 @@ public:
     }
 };
 
-template <typename P1> p_option<P1> const option(P1 p1) {
+template <typename P1, typename = typename P1::value_type>
+p_option<P1> const option(P1 p1) {
     return p_option<P1>(move(p1));
 }
 
@@ -281,7 +284,8 @@ public:
     }
 };
 
-template <typename P1> p_many<P1> const many(P1 p1) {
+template <typename P1, typename = typename P1::value_type>
+p_many<P1> const many(P1 p1) {
     return p_many<P1>(move(p1));
 }
 
@@ -305,7 +309,10 @@ public:
     }
 }; 
 
-template <typename P1, typename P2> p_sepby<P1, P2> const sepby(P1 p1, P2 p2) {
+template <typename P1, typename P2,
+    typename = typename P1::value_type,
+    typename = typename P2::value_type>
+p_sepby<P1, P2> const sepby(P1 p1, P2 p2) {
     return p_sepby<P1, P2>(move(p1), move(p2));
 }
 
@@ -326,7 +333,9 @@ public:
 };
 
 template <typename P1, typename P2,
-    typename enable_if<is_same<typename P1::value_type, typename P2::value_type>::value, int>::type = 0>
+    typename = typename P1::value_type,
+    typename = typename P2::value_type,
+    typename = typename enable_if<is_same<typename P1::value_type, typename P2::value_type>::value>::type>
 p_either<P1, P2> const operator|| (P1 p1, P2 p2) {
     return p_either<P1, P2>(move(p1), move(p2));
 }
@@ -348,7 +357,9 @@ public:
 };
 
 template <typename P1, typename P2,
-    typename enable_if<is_same<typename P1::value_type, typename P2::value_type>::value, int>::type = 0>
+    typename = typename P1::value_type,
+    typename = typename P2::value_type,
+    typename = typename enable_if<is_same<typename P1::value_type, typename P2::value_type>::value>::type>
 p_sequence<P1, P2> const operator&& (P1 p1, P2 p2) {
     return p_sequence<P1, P2>(move(p1), move(p2));
 }
@@ -364,20 +375,20 @@ public:
     p_lift_vector(P1&& p1) : p1(forward<P1>(p1)) {}
 
     bool operator() (fparse &p, value_type *v = nullptr) const {
-        if (v != nullptr) {
-            typename P1::value_type v1;
-            if (p1(p, &v1)) {
-                v->push_back(move(v1));
-                return true;
-            }
-            return false;
-        } else {
+        if (v == nullptr) {
             return p1(p, nullptr);
         }
+        typename P1::value_type v1;
+        if (p1(p, &v1)) {
+            v->push_back(move(v1));
+            return true;
+        }
+        return false;
     }
 };
 
-template <typename P1> const p_lift_vector<P1> lift_vector(P1 p1) {
+template <typename P1, typename = typename P1::value_type>
+p_lift_vector<P1> const lift_vector(P1 p1) {
     return p_lift_vector<P1>(move(p1));
 }
 
