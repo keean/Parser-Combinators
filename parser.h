@@ -103,7 +103,7 @@ template <typename P1, typename P2> class is_either {
     P2 const p2;
 
 public:
-    typedef void is_predicate_type;
+    typedef true_type is_predicate_type;
     string const name;
     is_either(P1&& p1, P2&& p2)
         : p1(forward<P1>(p1)), p2(forward<P2>(p2)), name("(" + p1.name + " or " + p2.name + ")") {}
@@ -125,7 +125,7 @@ template <typename P1> class is_not {
     P1 const p1;
 
 public:
-    typedef void is_predicate_type;
+    typedef true_type is_predicate_type;
     string const name;
     explicit is_not(P1&& p1) 
         : p1(forward<P1>(p1)), name("~" + p1.name) {}
