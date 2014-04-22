@@ -13,52 +13,59 @@ using namespace std;
 
 struct is_space {
     string const name = "space";
+    is_space() {}
     bool operator() (int const c) const {
         return ::isspace(c) != 0;
     }
-} is_space;
+} const is_space;
 
 struct is_digit {
     string const name = "digit";
+    is_digit() {}
     bool operator() (int const c) const {
         return ::isdigit(c) != 0;
     }
-} is_digit;
+} const is_digit;
 
 struct is_upper {
     string const name = "uppercase";
+    is_upper() {}
     bool operator() (int const c) const {
         return ::isupper(c) != 0;
     }
-} is_upper;
+} const is_upper;
 
 struct is_lower {
     string const name = "lowercase";
+    is_lower() {}
     bool operator() (int const c) const {
         return ::islower(c) != 0;
     }
-} is_lower;
+} const is_lower;
 
 struct is_alpha {
     string const name = "alphabetic";
+    is_alpha() {}
     bool operator() (int const c) const {
         return ::isalpha(c) != 0;
     }
-} is_alpha;
+} const is_alpha;
 
 struct is_alnum {
     string const name = "alphanumeric";
+    is_alnum() {}
     bool operator() (int const c) const {
         return ::isalnum(c) != 0;
     }
-} is_alnum;
+} const is_alnum;
 
 struct is_print {
     string const name = "printable";
+    is_print() {}
     bool operator() (int const c) const {
         return ::isprint(c) != 0;
     }
-} is_print;
+} const is_print;
 
 class is_char {
     string const name;
@@ -281,27 +288,6 @@ public:
 template <typename P> const p_option<P> option(P const &p) {
     return p_option<P>(p);
 }
-
-template <typename P, typename V> class p_map {
-    P const &p;
-
-public:
-    explicit p_map(P const &p) : p(p) {}
-
-    bool operator() (fparse &s, V &v) {
-        string r;
-        if (p(s, &r)) {
-            stringstream t(r);
-            t >> v;
-            return true;
-        }
-        return false;
-    }
-};
-
-template <typename P> const p_map<P> map(P const &p) {
-    return p_map<P>(p);
-};
 
 auto const is_minus = is_char('-');
 auto const space = many1(accept(is_space));
