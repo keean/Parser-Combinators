@@ -112,9 +112,9 @@ struct parse_error : public runtime_error {
     int const row;
     int const col;
     int const sym;
-    string const exp;
-    parse_error(string const& what, int row, int col, string exp, int sym)
-        : runtime_error(what), row(row), col(col), exp(move(exp)), sym(sym) {}
+    string const &exp;
+    parse_error(string const &what, int row, int col, string const &exp, int sym)
+        : runtime_error(what), row(row), col(col), exp(exp), sym(sym) {}
 };
 
 class fparse {
@@ -160,7 +160,7 @@ public:
     explicit p_accept(C const &p) : pred(p) {}
 
     bool operator() (fparse &p, string *s = nullptr) const {
-        int sym = p.get_sym();
+        int const sym = p.get_sym();
         if (!pred(sym)) {
             return false;
         }
@@ -183,7 +183,7 @@ public:
     explicit p_expect(C const &p) : pred(p) {}
 
     bool operator() (fparse &p, string *s = nullptr) const {
-        int sym = p.get_sym();
+        int const sym = p.get_sym();
         if (!pred(sym)) {
             p.error("expected", pred.name);   
         }
@@ -282,8 +282,28 @@ template <typename P> const p_option<P> option(P const &p) {
     return p_option<P>(p);
 }
 
-auto const is_minus = is_char('-');
+template <typename P, typename V> class p_map {
+    P const &p;
 
+public:
+    explicit p_map(P const &p) : p(p) {}
+
+    bool operator() (fparse &s, V &v) {
+        string r;
+        if (p(s, &r)) {
+            stringstream t(r);
+            t >> v;
+            return true;
+        }
+        return false;
+    }
+};
+
+template <typename P> const p_map<P> map(P const &p) {
+    return p_map<P>(p);
+};
+
+auto const is_minus = is_char('-');
 auto const space = many1(accept(is_space));
 auto const number = many1(accept(is_digit));
 auto const signed_number = option(accept(is_minus)) && number;
