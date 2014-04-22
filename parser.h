@@ -12,6 +12,7 @@ using namespace std;
 // Character Predicates
 
 struct is_any {
+    typedef true_type is_predicate_type;
     string const name = "anything";
     is_any() {}
     bool operator() (int const c) const {
@@ -20,6 +21,7 @@ struct is_any {
 } const is_any;
 
 struct is_space {
+    typedef true_type is_predicate_type;
     string const name = "space";
     is_space() {}
     bool operator() (int const c) const {
@@ -28,6 +30,7 @@ struct is_space {
 } const is_space;
 
 struct is_digit {
+    typedef true_type is_predicate_type;
     string const name = "digit";
     is_digit() {}
     bool operator() (int const c) const {
@@ -36,6 +39,7 @@ struct is_digit {
 } const is_digit;
 
 struct is_upper {
+    typedef true_type is_predicate_type;
     string const name = "uppercase";
     is_upper() {}
     bool operator() (int const c) const {
@@ -44,6 +48,7 @@ struct is_upper {
 } const is_upper;
 
 struct is_lower {
+    typedef true_type is_predicate_type;
     string const name = "lowercase";
     is_lower() {}
     bool operator() (int const c) const {
@@ -52,6 +57,7 @@ struct is_lower {
 } const is_lower;
 
 struct is_alpha {
+    typedef true_type is_predicate_type;
     string const name = "alphabetic";
     is_alpha() {}
     bool operator() (int const c) const {
@@ -60,6 +66,7 @@ struct is_alpha {
 } const is_alpha;
 
 struct is_alnum {
+    typedef true_type is_predicate_type;
     string const name = "alphanumeric";
     is_alnum() {}
     bool operator() (int const c) const {
@@ -68,6 +75,7 @@ struct is_alnum {
 } const is_alnum;
 
 struct is_print {
+    typedef true_type is_predicate_type;
     string const name = "printable";
     is_print() {}
     bool operator() (int const c) const {
@@ -79,6 +87,7 @@ class is_char {
     int const k;
 
 public:
+    typedef true_type is_predicate_type;
     string const name;
     explicit is_char(char const c)
         : k(c), name("'" + string(1, c) + "'") {}
@@ -94,6 +103,7 @@ template <typename P1, typename P2> class is_either {
     P2 const p2;
 
 public:
+    typedef void is_predicate_type;
     string const name;
     is_either(P1&& p1, P2&& p2)
         : p1(forward<P1>(p1)), p2(forward<P2>(p2)), name("(" + p1.name + " or " + p2.name + ")") {}
@@ -102,7 +112,10 @@ public:
     }
 };
 
-template <typename P1, typename P2> is_either<P1, P2> const operator+ (P1 p1, P2 p2) {
+template <typename P1, typename P2,
+    typename enable_if<is_same<typename P1::is_predicate_type, true_type>::value, int>::type = 0,
+    typename enable_if<is_same<typename P2::is_predicate_type, true_type>::value, int>::type = 0>
+is_either<P1, P2> const operator|| (P1 p1, P2 p2) {
     return is_either<P1, P2>(move(p1), move(p2));
 }
 
@@ -112,6 +125,7 @@ template <typename P1> class is_not {
     P1 const p1;
 
 public:
+    typedef void is_predicate_type;
     string const name;
     explicit is_not(P1&& p1) 
         : p1(forward<P1>(p1)), name("~" + p1.name) {}
@@ -120,7 +134,9 @@ public:
     }
 };
 
-template <typename P1> is_not<P1> const operator~ (P1 p1) {
+template <typename P1,
+    typename enable_if<is_same<typename P1::is_predicate_type, true_type>::value, int>::type = 0>
+is_not<P1> const operator~ (P1 p1) {
     return is_not<P1>(move(p1));
 }
 
@@ -132,7 +148,7 @@ struct parse_error : public runtime_error {
     int const col;
     int const sym;
     string const exp;
-    parse_error(string const what, int row, int col, string const exp, int sym)
+    parse_error(string const what, int const row, int const col, string const exp, int const sym)
         : runtime_error(move(what)), row(row), col(col), exp(move(exp)), sym(sym) {}
 };
 
@@ -145,8 +161,8 @@ class fparse {
 public:
     fparse(fstream &f) : in(f), row(1), col(1), sym(f.get()) {}
 
-    void error(string const& err, string const exp) {
-        throw parse_error(err, row, col, exp, sym);
+    void error(string const err, string const exp) {
+        throw parse_error(move(err), row, col, move(exp), sym);
     }
 
     void next() {
@@ -195,7 +211,7 @@ public:
     }
 };
 
-template <typename P> const p_accept<P> accept(P p) {
+template <typename P> p_accept<P> const accept(P p) {
     return p_accept<P>(move(p));
 }
 
@@ -222,7 +238,7 @@ public:
     }
 };
 
-template <typename P> const p_expect<P> expect(P p) {
+template <typename P> p_expect<P> const expect(P p) {
     return p_expect<P>(move(p));
 }
 
@@ -242,7 +258,7 @@ public:
     }
 };
 
-template <typename P1> const p_option<P1> option(P1 p1) {
+template <typename P1> p_option<P1> const option(P1 p1) {
     return p_option<P1>(move(p1));
 }
 
@@ -265,7 +281,7 @@ public:
     }
 };
 
-template <typename P1> const p_many<P1> many(P1 p1) {
+template <typename P1> p_many<P1> const many(P1 p1) {
     return p_many<P1>(move(p1));
 }
 
@@ -289,7 +305,7 @@ public:
     }
 }; 
 
-template <typename P1, typename P2> const p_sepby<P1, P2> sepby(P1 p1, P2 p2) {
+template <typename P1, typename P2> p_sepby<P1, P2> const sepby(P1 p1, P2 p2) {
     return p_sepby<P1, P2>(move(p1), move(p2));
 }
 
@@ -309,7 +325,9 @@ public:
     }
 };
 
-template <typename P1, typename P2> const p_either<P1, P2> operator|| (P1 p1, P2 p2) {
+template <typename P1, typename P2,
+    typename enable_if<is_same<typename P1::value_type, typename P2::value_type>::value, int>::type = 0>
+p_either<P1, P2> const operator|| (P1 p1, P2 p2) {
     return p_either<P1, P2>(move(p1), move(p2));
 }
 
@@ -329,7 +347,9 @@ public:
     }
 };
 
-template <typename P1, typename P2> const p_sequence<P1, P2> operator&& (P1 p1, P2 p2) {
+template <typename P1, typename P2,
+    typename enable_if<is_same<typename P1::value_type, typename P2::value_type>::value, int>::type = 0>
+p_sequence<P1, P2> const operator&& (P1 p1, P2 p2) {
     return p_sequence<P1, P2>(move(p1), move(p2));
 }
 
