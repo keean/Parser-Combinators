@@ -3,7 +3,6 @@
 // compile with g++ -std=gnu++11 
 // parser.h
 
-#include <iostream>
 #include <fstream>
 #include <stdexcept>
 
