@@ -169,7 +169,7 @@ public:
         sym = in.get();
         if (sym == '\n') {
             ++row;
-            col = 1;
+            col = 0;
         } else if (::isprint(sym)) {
             ++col;
         }
@@ -406,13 +406,13 @@ public:
         if (v == nullptr) {
             return p1.second(p, nullptr);
         }
+        if (v->find(p1.first) != v->end()) {
+            p.error("map key already exists", "'" + p1.first + "'");
+        }
         typename P1::second_type::value_type v1;
         if (p1.second(p, &v1)) {
-            if (v->insert(make_pair(p1.first, move(v1))).second) {
-                return true;
-            } else {
-                p.error("map key already exists", p1.first);
-            }
+            v->insert(make_pair(p1.first, v1));
+            return true;
         }
         return false;
     }
