@@ -1,6 +1,6 @@
 //----------------------------------------------------------------------------
 // copyright 2012, 2013, 2014 Keean Schupke
-// compile with g++ -std=gnu++11 
+// compile with -std=c++11 
 // parser.h
 
 #include <fstream>
@@ -390,6 +390,37 @@ public:
 template <typename P1, typename = typename P1::value_type>
 p_lift_vector<P1> const lift_vector(P1 p1) {
     return p_lift_vector<P1>(move(p1));
+}
+
+//----------------------------------------------------------------------------
+
+template <typename P1> class p_lift_map {
+    P1 const p1;
+
+public:
+    typedef map<typename P1::first_type, typename P1::second_type::value_type> value_type;
+
+    p_lift_map(P1&& p1) : p1(forward<P1>(p1)) {}
+
+    bool operator() (fparse &p, value_type *v = nullptr) const {
+        if (v == nullptr) {
+            return p1.second(p, nullptr);
+        }
+        typename P1::second_type::value_type v1;
+        if (p1.second(p, &v1)) {
+            if (v->insert(make_pair(p1.first, move(v1))).second) {
+                return true;
+            } else {
+                p.error("map key already exists", p1.first);
+            }
+        }
+        return false;
+    }
+};
+
+template <typename P1, typename = typename P1::second_type::value_type>
+p_lift_map<P1> const lift_map(P1 p1) {
+    return p_lift_map<P1>(move(p1));
 }
 
 //----------------------------------------------------------------------------
