@@ -129,7 +129,7 @@ class fparse {
         if (sym == '\n') {
             ++row;
             col = 1;
-        } else {
+        } else if (::isprint(sym)) {
             ++col;
         }
     }
@@ -165,11 +165,6 @@ protected:
             s->push_back(sym);
         }
         next();
-        return true;
-    }
-
-    template <typename F> bool many(F&& f) {
-        while (f);
         return true;
     }
 
