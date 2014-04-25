@@ -531,56 +531,11 @@ p_seq<PS...> const seq(PS... ps...) {
 
 //----------------------------------------------------------------------------
 
-template <typename F> struct function_traits;
-
-template <typename return_type, typename... arg_types>
-struct function_traits<return_type(*)(arg_types...)>
-    : public function_traits<return_type(arg_types...)> {};
-
-template <typename R, typename... arg_types>
-struct function_traits<R(arg_types...)> {
-    static constexpr size_t arity = sizeof...(arg_types);
-    using return_type = R;
-
-    template <size_t N> struct argument {
-        static_assert(N < arity, "error: invalid parameter index.");
-        using type = typename tuple_element<N, tuple<arg_types...>>::type;
-    };
-};
-
-template <typename class_type, typename return_type, typename... arg_types>
-struct function_traits<return_type(class_type::*)(arg_types...)>
-    : public function_traits<return_type(class_type&, arg_types...)> {};
-
-template <typename class_type, typename return_type, typename... arg_types>
-struct function_traits<return_type(class_type::*)(arg_types...) const>
-    : public function_traits<return_type(class_type&, arg_types...)> {};
-
-template <typename class_type, typename return_type>
-struct function_traits<return_type(class_type::*)>
-    : public function_traits<return_type(class_type&)> {};
-
-template <typename F> struct function_traits {
-    using call_type = function_traits<decltype(&F::operator())>;
-    using return_type = typename call_type::return_type;
-
-    static constexpr size_t arity = call_type::arity - 1;
-
-    template <size_t N>
-    struct argument {
-        static_assert(N < arity, "error: invalid parameter index.");
-        using type = typename call_type::template argument<N+1>::type;
-    };
-};
-
 template <size_t I, template <typename> class F, typename PS> struct apply_reduce {
     static constexpr int J = tuple_size<PS>::value - I;
-    using parser_type = typename tuple_element<J, PS>::type;
-    using parser_traits = function_traits<parser_type>;
-    using p1_type = typename remove_pointer<typename parser_traits::template argument<1>::type>::type;
-    using polymap_traits = function_traits<F<p1_type>>;
-    using f0_type = typename polymap_traits::template argument<0>::type;
-    bool operator() (PS const &ps, f0_type v, fparse &in) {
+    using p1_type = typename tuple_element<J, PS>::type::value_type;
+    using f0_type = typename F<p1_type>::value_type;
+    bool operator() (PS const &ps, f0_type *v, fparse &in) {
         if (v == nullptr) {
             if (get<J>(ps)(in, nullptr)) {
                 return apply_reduce<I - 1, F, PS>()(ps, v, in);
@@ -599,12 +554,9 @@ template <size_t I, template <typename> class F, typename PS> struct apply_reduc
 
 template <template <typename> class F, typename PS> struct apply_reduce<1, F, PS> {
     static constexpr int J = tuple_size<PS>::value - 1;
-    using parser_type = typename tuple_element<J, PS>::type;
-    using parser_traits = function_traits<parser_type>;
-    using p1_type = typename remove_pointer<typename parser_traits::template argument<1>::type>::type;
-    using polymap_traits = function_traits<F<p1_type>>;
-    using f0_type = typename polymap_traits::template argument<0>::type;
-    bool operator() (PS const &ps, f0_type v, fparse &in) {
+    using p1_type = typename tuple_element<J, PS>::type::value_type;
+    using f0_type = typename F<p1_type>::value_type;
+    bool operator() (PS const &ps, f0_type *v, fparse &in) {
         if (v == nullptr) {
             if (get<J>(ps)(in, nullptr)) {
                 return true;
@@ -622,12 +574,11 @@ template <template <typename> class F, typename PS> struct apply_reduce<1, F, PS
 };
 
 template <template <typename> class F , typename... PS> class p_reduce {
-    using polymap_traits = function_traits<F<true_type>>;
     using parser_types = tuple<PS...>;
     parser_types const ps;
 
 public:
-    using value_type = typename remove_pointer<typename polymap_traits::template argument<0>::type>::type;
+    using value_type = typename F<true_type>::value_type;
 
     p_reduce(PS&&... ps) : ps(make_tuple(forward<PS>(ps)...)) {}
 
@@ -665,12 +616,15 @@ struct parse_int {
     }
 } const parse_int;
 
+// polymorphic reduction function.
 template <typename T> struct acc_int {
-    void operator() (vector<int> *a, T b) {}
+    using value_type = vector<int>;
+    void operator() (value_type *a, T b) {}
 };
 
 template <> struct acc_int<int> {
-    void operator() (vector<int> *a, int b) {
+    using value_type = vector<int>;
+    void operator() (value_type *a, int b) {
         a->push_back(move(b));
     }
 };
