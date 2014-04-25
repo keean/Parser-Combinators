@@ -5,8 +5,42 @@
 
 #include <fstream>
 #include <stdexcept>
+#include <vector>
+#include <tuple>
+#include <type_traits>
 
 using namespace std;
+
+template <typename...> struct type_debug;
+
+template <size_t> struct idx {};
+
+template <typename T, size_t I> ostream& print_tuple(ostream& out, T const& t, idx<I>) {
+    out << get<I>(t) << ", ";
+    return print_tuple(out, t, idx<I - 1>());
+}
+
+template <typename T> ostream& print_tuple(ostream& out, T const& t, idx<0>) {
+    return out << get<0>(t);
+}
+
+template <typename... T> ostream& operator<< (ostream& out, tuple<T...> const& t) {
+    out << '<';
+    print_tuple(out, t, idx<sizeof...(T) - 1>());
+    return out << '>';
+}
+
+template <typename T> ostream& operator<< (ostream& out, vector<T> const& v) {
+    out << "[";
+    for (typename vector<T>::const_iterator i = v.begin(); i != v.end(); ++i) {
+        cout << *i;
+        typename vector<T>::const_iterator j = i;
+        if (++j != v.end()) {
+            cout << ", ";
+        }
+    }
+    return out << "]";
+}
 
 //----------------------------------------------------------------------------
 // Character Predicates
@@ -425,6 +459,180 @@ p_lift_map<P1> const lift_map(P1 p1) {
 
 //----------------------------------------------------------------------------
 
+template <typename F1, typename P1> class p_fold {
+    P1 const p1;
+    F1 f1;
+
+public:
+    //typedef typename result_of<F1(fparse&, typename P1::value_type*)>::type value_type;
+    //typedef result_of<F1(fparse&, typename P1::value_type*)> value_type;
+    typedef vector<typename P1::value_type> value_type;
+
+    p_fold(F1&& f1, P1&& p1) : f1(f1), p1(p1) {}
+
+    bool operator() (fparse &p, value_type *v = nullptr) {
+        if (v == nullptr) {
+            if (p1(p, nullptr)) {
+                while (p1(p, nullptr));
+                return true;
+            }
+        } else {
+            typename P1::value_type t;
+            if (p1(p, &t)) {
+                do {
+                    f1(v, t);
+                } while (p1(p, &t));
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+template <template<typename> class F1, typename P1,
+    typename = typename P1::value_type>
+p_fold<F1<typename P1::value_type>, P1> const fold(P1 p1) {
+    return p_fold<F1<typename P1::value_type>, P1>(move(F1<typename P1::value_type>()), move(p1));
+}
+
+//----------------------------------------------------------------------------
+
+template <size_t I, typename P, typename V> struct apply_parsers {
+    bool operator() (P const &p, V *v, fparse &in) {
+        if (get<I>(p)(in, &get<I>(*v))) {
+            return apply_parsers<I - 1, P, V>()(p, v, in);
+        }
+        return false;
+    }
+};
+
+template <typename P, typename V> struct apply_parsers<0, P, V> {
+    bool operator() (P const &p, V *v, fparse &in) {
+        return get<0>(p)(in, &get<0>(*v));
+    }
+};
+
+template <typename... PS> class p_seq {
+    typedef tuple<PS...> T;
+    T const ps;
+
+public:
+    typedef tuple<typename PS::value_type...> value_type;
+
+    p_seq(PS&&... ps) : ps(forward<PS>(ps)...) {}
+
+    bool operator() (fparse &in, value_type *v = nullptr) const {
+        return apply_parsers<sizeof...(PS) - 1, T, value_type>()(ps, v, in);
+    }
+};
+
+template <typename... PS>
+p_seq<PS...> const seq(PS... ps...) {
+    return p_seq<PS...>(move(ps)...);
+}
+
+//----------------------------------------------------------------------------
+
+template <typename F> struct function_traits;
+
+template <typename return_type, typename... arg_types>
+struct function_traits<return_type(*)(arg_types...)>
+    : public function_traits<return_type(arg_types...)> {};
+
+template <typename R, typename... arg_types>
+struct function_traits<R(arg_types...)> {
+    static constexpr size_t arity = sizeof...(arg_types);
+    using return_type = R;
+
+    template <size_t N> struct argument {
+        static_assert(N < arity, "error: invalid parameter index.");
+        using type = typename tuple_element<N, tuple<arg_types...>>::type;
+    };
+};
+
+template <typename class_type, typename return_type, typename... arg_types>
+struct function_traits<return_type(class_type::*)(arg_types...)>
+    : public function_traits<return_type(class_type&, arg_types...)> {};
+
+template <typename class_type, typename return_type, typename... arg_types>
+struct function_traits<return_type(class_type::*)(arg_types...) const>
+    : public function_traits<return_type(class_type&, arg_types...)> {};
+
+template <typename class_type, typename return_type>
+struct function_traits<return_type(class_type::*)>
+    : public function_traits<return_type(class_type&)> {};
+
+template <typename F> struct function_traits {
+    using call_type = function_traits<decltype(&F::operator())>;
+    using return_type = typename call_type::return_type;
+
+    static constexpr size_t arity = call_type::arity - 1;
+
+    template <size_t N>
+    struct argument {
+        static_assert(N < arity, "error: invalid parameter index.");
+        using type = typename call_type::template argument<N+1>::type;
+    };
+};
+
+template <size_t I, template <typename> class F, typename PS> struct apply_reduce {
+    static constexpr int J = tuple_size<PS>::value - I;
+    using parser_type = typename tuple_element<J, PS>::type;
+    using parser_traits = function_traits<parser_type>;
+    using p1_type = typename remove_pointer<typename parser_traits::template argument<1>::type>::type;
+    using polymap_traits = function_traits<F<p1_type>>;
+    using f0_type = typename polymap_traits::template argument<0>::type;
+    bool operator() (PS const &ps, f0_type v, fparse &in) {
+        p1_type u;
+        if (get<J>(ps)(in, &u)) {
+            F<p1_type> f;
+            f(v, u);
+            return apply_reduce<I - 1, F, PS>()(ps, v, in);
+        }
+        return false;
+    }
+};
+
+template <template <typename> class F, typename PS> struct apply_reduce<1, F, PS> {
+    static constexpr int J = tuple_size<PS>::value - 1;
+    using parser_type = typename tuple_element<J, PS>::type;
+    using parser_traits = function_traits<parser_type>;
+    using p1_type = typename remove_pointer<typename parser_traits::template argument<1>::type>::type;
+    using polymap_traits = function_traits<F<p1_type>>;
+    using f0_type = typename polymap_traits::template argument<0>::type;
+    bool operator() (PS const &ps, f0_type v, fparse &in) {
+        p1_type u;
+        if (get<J>(ps)(in, &u)) {
+            F<p1_type> f;
+            f(v, u);
+            return true;
+        }
+        return false;
+    }
+};
+
+template <template <typename> class F , typename... PS> class p_reduce {
+    using polymap_traits = function_traits<F<true_type>>;
+    using parser_types = tuple<PS...>;
+    parser_types const ps;
+
+public:
+    using value_type = typename remove_pointer<typename polymap_traits::template argument<0>::type>::type;
+
+    p_reduce(PS&&... ps) : ps(make_tuple(forward<PS>(ps)...)) {}
+
+    bool operator() (fparse &in, value_type *v = nullptr) const {
+        return apply_reduce<sizeof...(PS), F, parser_types>()(ps, v, in);
+    }
+};
+
+template <template <typename> class F, typename... PS>
+p_reduce<F, PS...> const reduce(PS... ps...) {
+    return p_reduce<F, PS...>(move(ps)...);
+}
+
+//----------------------------------------------------------------------------
+
 auto const is_minus = is_char('-');
 
 auto const space = many(accept(is_space));
@@ -436,8 +644,10 @@ struct parse_int {
     typedef int value_type;
     parse_int() {}
     bool operator() (fparse &p, value_type *i = nullptr) const {
+        cout << "parse_int\n";
         string s;
         if (signed_number(p, &s)) {
+            cout << "{" << s << "}";
             if (i != nullptr) {
                 *i = stoi(s);
             }
@@ -446,4 +656,17 @@ struct parse_int {
         return false;
     }
 } const parse_int;
+
+template <typename T> struct acc_int {
+    void operator() (vector<int> *a, T b) {}
+};
+
+template <> struct acc_int<int> {
+    void operator() (vector<int> *a, int b) {
+        a->push_back(move(b));
+    }
+};
+
+// example parser for CSV files, result is: vector<vector<int>>
+auto reduce_int = many(lift_vector(many(reduce<acc_int>(parse_int, accept(is_char(',')) && space)) && reduce<acc_int>(space)));
 
