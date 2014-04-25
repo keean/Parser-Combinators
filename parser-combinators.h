@@ -583,11 +583,17 @@ template <size_t I, template <typename> class F, typename PS> struct apply_reduc
     using polymap_traits = function_traits<F<p1_type>>;
     using f0_type = typename polymap_traits::template argument<0>::type;
     bool operator() (PS const &ps, f0_type v, fparse &in) {
-        p1_type u;
-        if (get<J>(ps)(in, &u)) {
-            F<p1_type> f;
-            f(v, u);
-            return apply_reduce<I - 1, F, PS>()(ps, v, in);
+        if (v == nullptr) {
+            if (get<J>(ps)(in, nullptr)) {
+                return apply_reduce<I - 1, F, PS>()(ps, v, in);
+            }
+        } else {
+            p1_type u;
+            if (get<J>(ps)(in, &u)) {
+                F<p1_type> f;
+                f(v, u);
+                return apply_reduce<I - 1, F, PS>()(ps, v, in);
+            }
         }
         return false;
     }
@@ -601,11 +607,17 @@ template <template <typename> class F, typename PS> struct apply_reduce<1, F, PS
     using polymap_traits = function_traits<F<p1_type>>;
     using f0_type = typename polymap_traits::template argument<0>::type;
     bool operator() (PS const &ps, f0_type v, fparse &in) {
-        p1_type u;
-        if (get<J>(ps)(in, &u)) {
-            F<p1_type> f;
-            f(v, u);
-            return true;
+        if (v == nullptr) {
+            if (get<J>(ps)(in, nullptr)) {
+                return true;
+            }
+        } else {
+            p1_type u;
+            if (get<J>(ps)(in, &u)) {
+                F<p1_type> f;
+                f(v, u);
+                return true;
+            }
         }
         return false;
     }
@@ -644,10 +656,8 @@ struct parse_int {
     typedef int value_type;
     parse_int() {}
     bool operator() (fparse &p, value_type *i = nullptr) const {
-        cout << "parse_int\n";
         string s;
         if (signed_number(p, &s)) {
-            cout << "{" << s << "}";
             if (i != nullptr) {
                 *i = stoi(s);
             }
