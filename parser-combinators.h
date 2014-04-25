@@ -46,7 +46,7 @@ template <typename T> ostream& operator<< (ostream& out, vector<T> const& v) {
 // Character Predicates
 
 struct is_any {
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name = "anything";
     is_any() {}
     bool operator() (int const c) const {
@@ -55,7 +55,7 @@ struct is_any {
 } const is_any;
 
 struct is_space {
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name = "space";
     is_space() {}
     bool operator() (int const c) const {
@@ -64,7 +64,7 @@ struct is_space {
 } const is_space;
 
 struct is_digit {
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name = "digit";
     is_digit() {}
     bool operator() (int const c) const {
@@ -73,7 +73,7 @@ struct is_digit {
 } const is_digit;
 
 struct is_upper {
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name = "uppercase";
     is_upper() {}
     bool operator() (int const c) const {
@@ -82,7 +82,7 @@ struct is_upper {
 } const is_upper;
 
 struct is_lower {
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name = "lowercase";
     is_lower() {}
     bool operator() (int const c) const {
@@ -91,7 +91,7 @@ struct is_lower {
 } const is_lower;
 
 struct is_alpha {
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name = "alphabetic";
     is_alpha() {}
     bool operator() (int const c) const {
@@ -100,7 +100,7 @@ struct is_alpha {
 } const is_alpha;
 
 struct is_alnum {
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name = "alphanumeric";
     is_alnum() {}
     bool operator() (int const c) const {
@@ -109,7 +109,7 @@ struct is_alnum {
 } const is_alnum;
 
 struct is_print {
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name = "printable";
     is_print() {}
     bool operator() (int const c) const {
@@ -121,7 +121,7 @@ class is_char {
     int const k;
 
 public:
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name;
     explicit is_char(char const c)
         : k(c), name("'" + string(1, c) + "'") {}
@@ -137,7 +137,7 @@ template <typename P1, typename P2> class is_either {
     P2 const p2;
 
 public:
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name;
     is_either(P1&& p1, P2&& p2)
         : p1(forward<P1>(p1)), p2(forward<P2>(p2)), name("(" + p1.name + " or " + p2.name + ")") {}
@@ -159,7 +159,7 @@ template <typename P1> class is_not {
     P1 const p1;
 
 public:
-    typedef true_type is_predicate_type;
+    using is_predicate_type = true_type;
     string const name;
     explicit is_not(P1&& p1) 
         : p1(forward<P1>(p1)), name("~" + p1.name) {}
@@ -228,7 +228,7 @@ template <typename P> class p_accept {
     P const pred;
 
 public:
-    typedef string value_type;
+    using value_type = string;
 
     explicit p_accept(P&& p) : pred(forward<P>(p)) {}
 
@@ -256,7 +256,7 @@ template <typename P> class p_expect {
     P const pred;
 
 public:
-    typedef string value_type;
+    using value_type = string;
 
     explicit p_expect(P&& p) : pred(forward<P>(p)) {}
 
@@ -284,7 +284,7 @@ template <typename P1> class p_option {
     P1 const p1;
 
 public:
-    typedef typename P1::value_type value_type;
+    using value_type = typename P1::value_type;
 
     explicit p_option(P1&& p1) : p1(forward<P1>(p1)) {}
 
@@ -305,7 +305,7 @@ template <typename P1> class p_many {
     P1 const p1;
 
 public:
-    typedef typename P1::value_type value_type;
+    using value_type = typename P1::value_type;
 
     explicit p_many(P1&& p1) : p1(forward<P1>(p1)) {}
 
@@ -330,7 +330,7 @@ template <typename P1, typename P2> class p_sepby {
     P2 const p2;
 
 public:
-    typedef typename P1::value_type value_type;
+    using value_type = typename P1::value_type;
 
     explicit p_sepby(P1&& p1, P2&& p2) : p1(forward<P1>(p1)), p2(forward<P2>(p2)) {}
 
@@ -357,7 +357,7 @@ template <typename P1, typename P2> class p_either {
     P2 const p2;
 
 public:
-    typedef typename P1::value_type value_type;
+    using value_type = typename P1::value_type;
 
     p_either(P1&& p1, P2&& p2) : p1(forward<P1>(p1)), p2(forward<P2>(p2)) {}
 
@@ -381,7 +381,7 @@ template <typename P1, typename P2> class p_sequence {
     P2 const p2;
 
 public:
-    typedef typename P1::value_type value_type;
+    using value_type = typename P1::value_type;
 
     p_sequence(P1&& p1, P2&& p2) : p1(forward<P1>(p1)), p2(forward<P2>(p2)) {}
 
@@ -404,7 +404,7 @@ template <typename P1> class p_lift_vector {
     P1 const p1;
 
 public:
-    typedef vector<typename P1::value_type> value_type;
+    using value_type = vector<typename P1::value_type>;
 
     p_lift_vector(P1&& p1) : p1(forward<P1>(p1)) {}
 
@@ -432,7 +432,7 @@ template <typename P1> class p_lift_map {
     P1 const p1;
 
 public:
-    typedef map<typename P1::first_type, typename P1::second_type::value_type> value_type;
+    using value_type = map<typename P1::first_type, typename P1::second_type::value_type>;
 
     p_lift_map(P1&& p1) : p1(forward<P1>(p1)) {}
 
@@ -464,9 +464,7 @@ template <typename F1, typename P1> class p_fold {
     F1 f1;
 
 public:
-    //typedef typename result_of<F1(fparse&, typename P1::value_type*)>::type value_type;
-    //typedef result_of<F1(fparse&, typename P1::value_type*)> value_type;
-    typedef vector<typename P1::value_type> value_type;
+    using value_type = vector<typename P1::value_type>;
 
     p_fold(F1&& f1, P1&& p1) : f1(f1), p1(p1) {}
 
@@ -513,11 +511,11 @@ template <typename P, typename V> struct apply_parsers<0, P, V> {
 };
 
 template <typename... PS> class p_seq {
-    typedef tuple<PS...> T;
+    using T = tuple<PS...>;
     T const ps;
 
 public:
-    typedef tuple<typename PS::value_type...> value_type;
+    using value_type = tuple<typename PS::value_type...>;
 
     p_seq(PS&&... ps) : ps(forward<PS>(ps)...) {}
 
