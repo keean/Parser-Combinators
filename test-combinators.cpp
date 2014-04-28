@@ -46,8 +46,9 @@ struct acc {
 
 auto const recognise_number = many(accept(is_digit));
 auto const recognise_space = many(accept(is_space));
-auto const recognise_separator = option(accept(is_char(',')) && recognise_space);
-auto const parse_csv = fold(vec_stats, fold(acc, recognise_number && discard(recognise_separator)) && discard(option(recognise_space)));
+auto const recognise_separator = option(accept(is_char(',')) && discard(option(recognise_space)));
+//auto const parse_csv = fold(vec_stats, fold(acc, recognise_number && discard(recognise_separator)) && discard(option(recognise_space)));
+auto const parse_csv = many(push(many(push(seq(recognise_number, recognise_separator))) && discard(option(recognise_space))));
 
 class csv_parser {
     fparse in;
