@@ -23,7 +23,7 @@ ostream& operator<< (ostream &out, stats const& s) {
     return cout << "{num = " << num << ", avg = " << avg << ", var = " << var << "}";
 }
 
-// higher order function to fold stats into a vector
+// function to fold stats into a vector
 template <typename T> struct vec {
     vec() {};
     void operator() (vector<T> *ts, T &t) const {
@@ -33,7 +33,7 @@ template <typename T> struct vec {
 
 auto const vec_stats = vec<stats>() ;
 
-// higher order functon to fold CSV lines into sum and sum-of-squares.
+// functon to fold CSV lines into sum and sum-of-squares.
 struct acc {
     acc() {};
     void operator() (stats *s, string &t) const {
