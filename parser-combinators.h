@@ -211,7 +211,7 @@ template <typename A, typename B> struct is_compatible {
 // Choose the result type of two parsers which a pointer the other result type
 // can be conveted into a pointer to.  For example given a parsers with result types
 // void and int, the least general is int, because (void*) can be implicitely converted
-// to (int*). If there is no possible implicit converstion result_type is undefined.:w
+// to (int*). If there is no possible implicit converstion result_type is undefined.
 template <typename P1, typename P2, typename = void> struct least_general {};
 
 template <typename P1, typename P2> struct least_general <P1, P2, typename enable_if<is_convertible<

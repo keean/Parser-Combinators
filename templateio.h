@@ -7,6 +7,8 @@
 #include <vector>
 #include <tuple>
 
+using namespace std;
+
 //----------------------------------------------------------------------------
 // iostream output for tuples.
 
