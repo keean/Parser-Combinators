@@ -12,37 +12,6 @@
 
 using namespace std;
 
-template <typename...> struct type_debug;
-
-template <size_t> struct idx {};
-
-template <typename T, size_t I> ostream& print_tuple(ostream& out, T const& t, idx<I>) {
-    out << get<tuple_size<T>::value - I>(t) << ", ";
-    return print_tuple(out, t, idx<I - 1>());
-}
-
-template <typename T> ostream& print_tuple(ostream& out, T const& t, idx<1>) {
-    return out << get<tuple_size<T>::value - 1>(t);
-}
-
-template <typename... T> ostream& operator<< (ostream& out, tuple<T...> const& t) {
-    out << '<';
-    print_tuple(out, t, idx<sizeof...(T)>());
-    return out << '>';
-}
-
-template <typename T> ostream& operator<< (ostream& out, vector<T> const& v) {
-    out << "[";
-    for (typename vector<T>::const_iterator i = v.begin(); i != v.end(); ++i) {
-        cout << *i;
-        typename vector<T>::const_iterator j = i;
-        if (++j != v.end()) {
-            cout << ", ";
-        }
-    }
-    return out << "]";
-}
-
 //----------------------------------------------------------------------------
 // Character Predicates
 
@@ -634,60 +603,4 @@ template <template <typename> class F, typename... PS>
 p_reduce<F, PS...> const reduce(PS const&... ps) {
     return p_reduce<F, PS...>(ps...);
 }
-
-//----------------------------------------------------------------------------
-
-auto const is_minus = is_char('-');
-
-// monomorphic reduction function.
-template <typename T> struct acc_vector {
-    using value_type = vector<T>;
-    void operator() (value_type *a, T&& b) {
-        a->push_back(forward<T>(b));
-    }
-};
-
-// returns sum of the integers
-template <typename T> struct sum_int; 
-
-template <> struct sum_int<string> {
-    using value_type = int;
-    void operator() (value_type *a, string const &b) {
-        *a += stoi(b);
-    }
-};
-
-// polymorphic reduction function.
-struct ints_and_strings {
-    vector<int> i;
-    vector<string> s;
-};
-
-ostream& operator<< (ostream &out, ints_and_strings is) {
-    return out << "{" << is.i << ", " << is.s << "}";
-}
-
-template <typename T> struct acc_int {
-    using value_type = ints_and_strings;
-    void operator() (value_type *a, T&& b) {
-        a->s.push_back(forward<T>(b));
-    }
-};
-
-template <> struct acc_int<int> {
-    using value_type = ints_and_strings;
-    void operator() (value_type *a, int b) {
-        a->i.push_back(b);
-    }
-};
-
-// example name parser
-//auto const name = accept(is_alpha) && option(many(accept(is_alnum)));
-
-// example parser for CSV files, result is: vector<vector<int>>
-//auto const space = many(accept(is_space));
-//auto const number = many(accept(is_digit));
-//auto const signed_number = option(accept(is_minus)) && number;
-//auto const parse_int = reduce<sum_int>(signed_number);
-//auto const reduce_int = many(reduce<acc_vector>(many(reduce<acc_int>(parse_int, accept(is_char(',')) && space)) && reduce<acc_int>(space)));
 
