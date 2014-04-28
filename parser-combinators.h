@@ -501,24 +501,23 @@ parser_fold<F, P> const fold(F const& f, P const& p) {
 
 //----------------------------------------------------------------------------
 
-template <size_t Index, typename Parsers, typename Result_Type> struct apply_parsers {
-    static constexpr int J = tuple_size<Parsers>::value - Index;
-    bool operator() (Parsers const &ps, Result_Type *result, fparse &in) const {
-        cout << J << "\n";
-        if (get<J>(ps)(in, &get<J>(*result))) {
-            return apply_parsers<Index - 1, Parsers, Result_Type>()(ps, result, in);
-        }
-        return false;
-    }
-};
+template <size_t> struct seq_idx {};
 
-template <typename Parsers, typename Result_Type> struct apply_parsers<1, Parsers, Result_Type> {
-    static constexpr int J = tuple_size<Parsers>::value - 1;
-    bool operator() (Parsers const &ps, Result_Type *result, fparse &in) const {
-        cout << J << "\n";
-        return get<J>(ps)(in, &get<J>(*result));
+template <typename Parsers, typename Result_Type, size_t Index>
+bool seq_apply(Parsers const &ps, Result_Type *result, fparse &in, seq_idx<Index>) {
+    static constexpr int J = tuple_size<Parsers>::value - Index;
+    if (get<J>(ps)(in, &get<J>(*result))) {
+        return seq_apply(ps, result, in, seq_idx<Index - 1>());
     }
-};
+    return false;
+}
+
+template <typename Parsers, typename Result_Type> 
+bool seq_apply(Parsers const &ps, Result_Type *result, fparse &in, seq_idx<1>) {
+    static constexpr int J = tuple_size<Parsers>::value - 1;
+    cout << J << "\n";
+    return get<J>(ps)(in, &get<J>(*result));
+}
 
 template <typename... Parsers> class parser_tuple {
     using tuple_type = tuple<Parsers...>;
@@ -532,7 +531,7 @@ public:
 
     template <typename Result_Type>
     bool operator() (fparse &in, Result_Type *result = nullptr) const {
-        return apply_parsers<sizeof...(Parsers), tuple_type, Result_Type>()(ps, result, in);
+        return seq_apply(ps, result, in, seq_idx<sizeof...(Parsers)>());
     }
 };
 
