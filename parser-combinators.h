@@ -3,7 +3,8 @@
 // compile with -std=c++11 
 // parser.h
 
-#include <fstream>
+//#include <fstream>
+#include <istream>
 #include <stdexcept>
 #include <vector>
 #include <tuple>
@@ -147,7 +148,7 @@ is_not<P1> const operator~ (P1 const& p1) {
 }
 
 //===========================================================================
-// Recursive Descent Parser
+// File Stream With Location (Row/Col)
 
 struct parse_error : public runtime_error {
     int const row;
@@ -158,16 +159,14 @@ struct parse_error : public runtime_error {
         : runtime_error(what), row(row), col(col), exp(exp), sym(sym) {}
 };
 
-template <typename P> class parser;
-
 class fparse {
-    fstream &in;
+    istream &in;
     int row;
     int col;
     int sym;
 
 public:
-    fparse(fstream &f) : in(f), row(1), col(1), sym(f.get()) {}
+    fparse(istream &f) : in(f), row(1), col(1), sym(f.get()) {}
 
     void error(string const& err, string const& exp) {
         throw parse_error(err, row, col, exp, sym);
