@@ -1,4 +1,4 @@
-//----------------------------------------------------------------------------
+//============================================================================
 // copyright 2012, 2013, 2014 Keean Schupke
 // compile with -std=c++11 
 // parser.h
@@ -195,9 +195,10 @@ public:
     }
 };
 
-//----------------------------------------------------------------------------
+//============================================================================
 // Type Helpers
 
+//----------------------------------------------------------------------------
 // Can a pointer to one type be implicitly converted into a pointer to the other.
 template <typename A, typename B> struct is_compatible {
     static constexpr bool value = is_convertible<
@@ -207,6 +208,7 @@ template <typename A, typename B> struct is_compatible {
         >::value;
 };
 
+//----------------------------------------------------------------------------
 // Choose the result type of two parsers which a pointer the other result type
 // can be conveted into a pointer to.  For example given a parsers with result types
 // void and int, the least general is int, because (void*) can be implicitely converted
