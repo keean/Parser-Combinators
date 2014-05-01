@@ -6,60 +6,41 @@
 using namespace std;
 
 //----------------------------------------------------------------------------
-//
-struct stats {
-    int num;
-    int sum;
-    int sum2;
-
-    stats(int num, int sum, int sum2) : num(num), sum(sum), sum2(sum2) {}
-};
-
-ostream& operator<< (ostream &out, stats const& s) {
-    double const num = static_cast<double>(s.num);
-    double const avg = static_cast<double>(s.sum) / num;
-    double const var = static_cast<double>(s.sum2) / num - avg;
-    return cout << "{num = " << num << ", avg = " << avg << ", var = " << var << "}";
-}
-
 
 struct csv_parser : private fparse {
 
     csv_parser(fstream &in) : fparse(in) {}
 
-    bool parse_csv(vector<stats>& s) {
+    bool parse_csv(vector<vector<int>> &result) {
         do {
             if (accept(is_char(EOF))) {
                 break;
             }
-            s.emplace_back(0, 0, 0);
+            vector<int> tmp;
             do {
                 space();
                 string n;
                 if (number(&n)) {
-                    int const i = stoi(n);
-                    stats &b = s.back();
-                    b.num += 1;
-                    b.sum += i;
-                    b.sum2 += i * i;
+                    tmp.push_back(stoi(n));
                 } else {
                     break;
                 }
             } while(accept(is_char(',')));
+            result.push_back(move(tmp));
         } while(accept(is_not(is_char(EOF))));
-        return s.size() > 0;
+        return result.size() > 0;
     }
 
     void operator() () {
-        vector<stats> s;
+        vector<vector<int>> a;
 
-        if (parse_csv(s)) {
+        if (parse_csv(a)) {
             cout << "OK\n";
         } else {
             cout << "FAIL\n";
         }
         
-        cout << s << "\n";
+        cout << a << "\n";
     }
 };
 
