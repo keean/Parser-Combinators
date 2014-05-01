@@ -3,7 +3,6 @@
 // compile with -std=c++11 
 // parser.h
 
-//#include <fstream>
 #include <istream>
 #include <stdexcept>
 #include <vector>
@@ -104,7 +103,7 @@ public:
 is_char const is_eof(EOF);
 
 //----------------------------------------------------------------------------
-// Combining character predicates.
+// Combining character predicates: ||, ~
 
 template <typename P1, typename P2> class is_either {
     P1 const p1;
@@ -244,14 +243,14 @@ template <typename P1, typename P2> struct least_general <P1, P2, typename enabl
 //----------------------------------------------------------------------------
 // Stream is advanced if symbol matches, and symbol is appended to result.
 
-template <typename Predicate> class parser_accept {
+template <typename Predicate> class recogniser_accept {
     Predicate const p;
 
 public:
     using is_parser_type = true_type;
     using result_type = string;
 
-    explicit parser_accept(Predicate const& p) : p(p) {}
+    explicit recogniser_accept(Predicate const& p) : p(p) {}
 
     bool operator() (fparse &in, string *result = nullptr) const {
         int const sym = in.get_sym();
@@ -267,21 +266,21 @@ public:
 };
 
 template <typename P, typename = typename P::is_predicate_type>
-parser_accept<P> const accept(P const &p) {
-    return parser_accept<P>(p);
+recogniser_accept<P> const accept(P const &p) {
+    return recogniser_accept<P>(p);
 }
 
 //----------------------------------------------------------------------------
 // Throw exception if symbol does not match, accept otherwise.
 
-template <typename Predicate> class parser_expect {
+template <typename Predicate> class recogniser_expect {
     Predicate const p;
 
 public:
     using is_parser_type = true_type;
     using result_type = string;
 
-    explicit parser_expect(Predicate const& p) : p(p) {}
+    explicit recogniser_expect(Predicate const& p) : p(p) {}
 
     bool operator() (fparse &in, string *result = nullptr) const {
         int const sym = in.get_sym();
@@ -297,8 +296,8 @@ public:
 };
 
 template <typename P, typename = typename P::is_predicate_type>
-parser_expect<P> const expect(P const& p) {
-    return parser_expect<P>(p);
+recogniser_expect<P> const expect(P const& p) {
+    return recogniser_expect<P>(p);
 }
 
 //============================================================================
@@ -335,88 +334,8 @@ struct parser_fail {
 } const fail;
 
 //============================================================================
-// Lifting String Recognisers to Parsers: lift, map, fold
+// Lifting String Recognisers to Parsers, and Parsers up one level: fmap
 
-//----------------------------------------------------------------------------
-// depricate single argument version of fmap in facour of variadic one.
-/*
-template <typename Functor, typename Parser> class parser_fmap {
-    using functor_traits = function_traits<Functor>;
-    Parser const p;
-    Functor const f;
-
-public:
-    using is_parser_type = true_type;
-    using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
-
-    explicit parser_fmap(Functor const& f, Parser const& p) : f(f), p(p) {}
-
-    template <typename Result_Type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
-        typename Parser::result_type tmp {};
-        if (p(in, &tmp)) {
-            f(result, tmp);
-            return true;
-        }
-        return false;
-    }
-};
-
-template <typename F, typename P, typename = typename P::is_parser_type>
-parser_fmap<F, P> const fmap (F const& f, P const& p) {
-    return parser_fmap<F, P>(f, p);
-}
-*/
-//----------------------------------------------------------------------------
-// fold, depricate in favour of fmap, note fold = some(fmap(...))
-/*
-template <typename Functor, typename Parser> class parser_fold {
-    using functor_traits = function_traits<Functor>;
-    Parser const p;
-    Functor const f;
-
-public:
-    using is_parser_type = true_type;
-    using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
-
-    parser_fold(Functor const& f, Parser const& p) : f(f), p(p) {}
-
-    template <typename Result_Type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
-        if (result == nullptr) {
-            typename Parser::result_type* discard_result = nullptr;
-            if (p(in, discard_result)) {
-                while (p(in, discard_result));
-                return true;
-            }
-            return false;
-        }
-
-        {
-            typename Parser::result_type tmp {};
-            if (!p(in, &tmp)) {
-                return false;
-            }
-            f(result, tmp);
-        }
-
-        while (true) {
-            typename Parser::result_type tmp {};
-            if (!p(in, &tmp)) {
-                return true;
-            }
-            f(result, tmp);
-        }
-    }
-};
-
-template <typename F, typename P,
-    typename = typename P::is_parser_type,
-    typename = typename enable_if<!is_same<typename P::result_type, void>::value>::type>
-parser_fold<F, P> const fold(F const& f, P const& p) {
-    return parser_fold<F, P>(f, p);
-}
-*/
 //----------------------------------------------------------------------------
 // If all parsers succeed, pass all results as arguments to user supplied functor
 
@@ -467,77 +386,13 @@ parser_fmap<F, PS...> const fmap(F const& f, PS const&... ps) {
     return parser_fmap<F, PS...>(f, ps...);
 }
 
-//----------------------------------------------------------------------------
-// polymorphic fold/reduce: dericate in favour of fmap, equivalent to fmap(...)
-/*
-template <size_t I, template <typename> class F, typename PS> struct apply_reduce {
-    static constexpr int J = tuple_size<PS>::value - I;
-    using p1_type = typename tuple_element<J, PS>::type::value_type;
-    using f0_type = typename F<p1_type>::value_type;
-    bool operator() (PS const &ps, f0_type *v, fparse &in) {
-        if (v == nullptr) {
-            if (get<J>(ps)(in, nullptr)) {
-                return apply_reduce<I - 1, F, PS>()(ps, v, in);
-            }
-        } else {
-            p1_type u {};
-            if (get<J>(ps)(in, &u)) {
-                F<p1_type> f;
-                f(v, u);
-                return apply_reduce<I - 1, F, PS>()(ps, v, in);
-            }
-        }
-        return false;
-    }
-};
-
-template <template <typename> class F, typename PS> struct apply_reduce<1, F, PS> {
-    static constexpr int J = tuple_size<PS>::value - 1;
-    using p1_type = typename tuple_element<J, PS>::type::value_type;
-    using f0_type = typename F<p1_type>::value_type;
-    bool operator() (PS const &ps, f0_type *v, fparse &in) {
-        if (v == nullptr) {
-            if (get<J>(ps)(in, nullptr)) {
-                return true;
-            }
-        } else {
-            p1_type u {};
-            if (get<J>(ps)(in, &u)) {
-                F<p1_type> f;
-                f(v, u);
-                return true;
-            }
-        }
-        return false;
-    }
-};
-
-template <template <typename> class F , typename... PS> class p_reduce {
-    using parser_types = tuple<PS...>;
-    parser_types const ps;
-
-public:
-    using value_type = typename F<typename tuple_element<0, parser_types>::type::value_type>::value_type;
-
-    p_reduce(PS const&... ps) : ps(make_tuple(ps...)) {}
-
-    bool operator() (fparse &in, value_type *v = nullptr) const {
-        return apply_reduce<sizeof...(PS), F, parser_types>()(ps, v, in);
-    }
-};
-
-template <template <typename> class F, typename... PS>
-p_reduce<F, PS...> const reduce(PS const&... ps) {
-    return p_reduce<F, PS...>(ps...);
-}
-*/
 //============================================================================
 // Combinators For Both Parsers and Recognisers: ||, &&, many, discard 
 
 //----------------------------------------------------------------------------
 // Run the second parser only if the first fails.
 
-template <typename Parser1, typename Parser2> class parser_choice { 
+template <typename Parser1, typename Parser2> class combinator_choice { 
     Parser1 const p1;
     Parser2 const p2;
 
@@ -545,7 +400,7 @@ public:
     using is_parser_type = true_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
 
-    parser_choice(Parser1 const& p1, Parser2 const& p2)
+    combinator_choice(Parser1 const& p1, Parser2 const& p2)
         : p1(p1), p2(p2) {}
 
     template <typename Result_Type>
@@ -558,14 +413,14 @@ template <typename P1, typename P2,
     typename = typename P1::is_parser_type,
     typename = typename P2::is_parser_type,
     typename = typename enable_if<is_compatible<typename P1::result_type, typename P2::result_type>::value>::type>
-parser_choice<P1, P2> const operator|| (P1 const& p1, P2 const& p2) {
-    return parser_choice<P1, P2>(p1, p2);
+combinator_choice<P1, P2> const operator|| (P1 const& p1, P2 const& p2) {
+    return combinator_choice<P1, P2>(p1, p2);
 }
 
 //----------------------------------------------------------------------------
 // Run the second parser only if the first succeeds. 
 
-template <typename Parser1, typename Parser2> class parser_sequence {
+template <typename Parser1, typename Parser2> class combinator_sequence {
     Parser1 const p1;
     Parser2 const p2;
 
@@ -573,7 +428,7 @@ public:
     using is_parser_type = true_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
 
-    parser_sequence(Parser1 const& p1, Parser2 const& p2)
+    combinator_sequence(Parser1 const& p1, Parser2 const& p2)
         : p1(p1), p2(p2) {}
 
     template <typename Result_Type>
@@ -586,21 +441,21 @@ template <typename P1, typename P2,
     typename = typename P1::is_parser_type,
     typename = typename P2::is_parser_type,
     typename = typename enable_if<is_compatible<typename P1::result_type, typename P2::result_type>::value>::type>
-parser_sequence<P1, P2> const operator&& (P1 const& p1, P2 const& p2) {
-    return parser_sequence<P1, P2>(p1, p2);
+combinator_sequence<P1, P2> const operator&& (P1 const& p1, P2 const& p2) {
+    return combinator_sequence<P1, P2>(p1, p2);
 }
 
 //----------------------------------------------------------------------------
 // Accept the parser zero or more times.
 
-template <typename Parser> class parser_many {
+template <typename Parser> class combinator_many {
     Parser const p;
 
 public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
 
-    explicit parser_many(Parser const& p) : p(p) {}
+    explicit combinator_many(Parser const& p) : p(p) {}
 
     template <typename Result_Type>
     bool operator() (fparse &in, Result_Type *result = nullptr) const {
@@ -610,21 +465,21 @@ public:
 };
 
 template <typename P, typename = typename P::is_parser_type>
-parser_many<P> const many(P const& p) {
-    return parser_many<P>(p);
+combinator_many<P> const many(P const& p) {
+    return combinator_many<P>(p);
 }
 
 //----------------------------------------------------------------------------
 // Discard the result of the parser (and the result type), keep succeed or fail.
 
-template <typename Parser> class parser_discard {
+template <typename Parser> class combinator_discard {
     Parser const p;
 
 public:
     using is_parser_type = true_type;
     using result_type = void;
 
-    explicit parser_discard(Parser const& p) : p(p) {}
+    explicit combinator_discard(Parser const& p) : p(p) {}
 
     template <typename Result_Type>
     bool operator() (fparse &in, Result_Type *result = nullptr) const {
@@ -634,8 +489,8 @@ public:
 };
 
 template <typename P, typename = typename P::is_parser_type>
-parser_discard<P> const discard(P const& p) {
-    return parser_discard<P>(p);
+combinator_discard<P> const discard(P const& p) {
+    return combinator_discard<P>(p);
 }
 
 //============================================================================
