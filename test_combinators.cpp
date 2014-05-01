@@ -3,6 +3,7 @@
 #include <vector>
 #include "templateio.hpp"
 #include "parser_combinators.hpp"
+#include "profile.hpp"
 
 using namespace std;
 
@@ -37,13 +38,19 @@ public:
     void operator() () {
         decltype(parse_csv)::result_type a; 
 
-        if (parse_csv(in, &a)) {
+        bool b;
+        {
+            profile<csv_parser> p;
+            b = parse_csv(in, &a);
+        }
+
+        if (b) {
             cout << "OK\n";
         } else {
             cout << "FAIL\n";
         }
         
-        cout << a << "\n";
+        cout << "lines: " << a.size() << "\n";
     }
 };
 
@@ -60,7 +67,9 @@ int main(int const argc, char const *argv[]) {
 
                 if (in.is_open()) {
                     csv_parser csv(in);
+                    profile<csv_parser>::reset();
                     csv();
+                    cout << "time: " << profile<csv_parser>::report() << "us\n";
                 }
             } catch (parse_error& e) {
                 cerr << argv[i] << ": " << e.what()

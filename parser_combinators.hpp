@@ -1,7 +1,7 @@
 //============================================================================
 // copyright 2012, 2013, 2014 Keean Schupke
 // compile with -std=c++11 
-// parser.h
+// parser_combinators.hpp
 
 #include <istream>
 #include <stdexcept>

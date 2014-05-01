@@ -2,6 +2,7 @@
 #include <vector>
 #include "templateio.hpp"
 #include "parser_simple.hpp"
+#include "profile.hpp"
 
 using namespace std;
 
@@ -12,6 +13,8 @@ struct csv_parser : private fparse {
     csv_parser(fstream &in) : fparse(in) {}
 
     bool parse_csv(vector<vector<int>> &result) {
+        profile<csv_parser> p;
+
         do {
             if (accept(is_char(EOF))) {
                 break;
@@ -40,7 +43,7 @@ struct csv_parser : private fparse {
             cout << "FAIL\n";
         }
         
-        cout << a << "\n";
+        cout << "lines: " << a.size() << "\n";
     }
 };
 
@@ -57,7 +60,9 @@ int main(int const argc, char const *argv[]) {
 
                 if (in.is_open()) {
                     csv_parser csv(in);
+                    profile<csv_parser>::reset();
                     csv();
+                    cout << "time: " << profile<csv_parser>::report() << "us\n";
                 }
             } catch (parse_error& e) {
                 cerr << argv[i] << ": " << e.what()

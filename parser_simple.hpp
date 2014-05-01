@@ -1,7 +1,7 @@
 //----------------------------------------------------------------------------
 // copyright 2012, 2013, 2014 Keean Schupke
-// compile with g++ -std=gnu++11 
-// parser.h
+// compile with -std=gnu++11 
+// parser_simple.hpp
 
 #include <fstream>
 #include <stdexcept>

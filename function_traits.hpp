@@ -7,6 +7,9 @@
 
 using namespace std;
 
+//----------------------------------------------------------------------------
+// traits for functions, function objects and lambdas
+
 template <typename F> struct function_traits;
 
 template <typename return_type, typename... arg_types>
