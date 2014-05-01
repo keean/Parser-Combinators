@@ -337,9 +337,63 @@ struct parser_fail {
 // Lifting String Recognisers to Parsers, and Parsers up one level: fmap
 
 //----------------------------------------------------------------------------
+// as soon as one parser succeeds, pass result to user supplied functor
+
+template <typename Functor, typename... Parsers> class fmap_choice {
+    using functor_traits = function_traits<Functor>;
+    using tuple_type = tuple<Parsers...>;
+    using tmp_type = tuple<typename Parsers::result_type...>;
+    tuple_type const ps;
+    Functor const f;
+
+    template <typename Rs, size_t I0, size_t... Is> 
+    int any_parsers(fparse &in, Rs &rs, size_t, size_t is...) const {
+        if (get<I0>(ps)(in, &get<I0>(rs))) {
+            return I0;
+        }
+        return any_parsers<Rs, Is...>(in, rs, is);
+    }
+
+    template <typename Rs, size_t I0>
+    int any_parsers(fparse &in, Rs &rs, size_t) const {
+        if (get<I0>(ps)(in, &get<I0>(rs))) {
+            return I0;
+        }
+        return -1;
+    }
+
+    template <typename Result_Type, size_t... I> 
+    bool fmap_any(fparse &in, size_sequence<I...> seq, Result_Type *result) const {
+        tmp_type tmp {};
+        int const i = any_parsers<tmp_type, I...>(in, tmp, I...);
+        if (i >= 0) {
+            f(result, i, get<I>(tmp)...);
+            return true;
+        }
+        return false;
+    }
+
+public:
+    using is_parser_type = true_type;
+    using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
+
+    fmap_choice(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
+
+    template <typename Result_Type, typename Is = typename range<0, sizeof...(Parsers)>::type>
+    bool operator() (fparse &in, Result_Type *result = nullptr) const {
+        return fmap_any(in, Is(), result);
+    }
+};
+
+template <typename F, typename... PS>
+fmap_choice<F, PS...> const any(F const& f, PS const&... ps) {
+    return fmap_choice<F, PS...>(f, ps...);
+}
+
+//----------------------------------------------------------------------------
 // If all parsers succeed, pass all results as arguments to user supplied functor
 
-template <typename Functor, typename... Parsers> class parser_fmap {
+template <typename Functor, typename... Parsers> class fmap_sequence {
     using functor_traits = function_traits<Functor>;
     using tuple_type = tuple<Parsers...>;
     using tmp_type = tuple<typename Parsers::result_type...>;
@@ -373,7 +427,7 @@ public:
     using is_parser_type = true_type;
     using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
 
-    parser_fmap(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
+    fmap_sequence(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
 
     template <typename Result_Type, typename Is = typename range<0, sizeof...(Parsers)>::type>
     bool operator() (fparse &in, Result_Type *result = nullptr) const {
@@ -382,8 +436,8 @@ public:
 };
 
 template <typename F, typename... PS>
-parser_fmap<F, PS...> const fmap(F const& f, PS const&... ps) {
-    return parser_fmap<F, PS...>(f, ps...);
+fmap_sequence<F, PS...> const all(F const& f, PS const&... ps) {
+    return fmap_sequence<F, PS...>(f, ps...);
 }
 
 //============================================================================
