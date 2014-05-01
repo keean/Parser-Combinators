@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
-#include "templateio.h"
-#include "parser-simple.h"
+#include "templateio.hpp"
+#include "parser_simple.hpp"
 
 using namespace std;
 

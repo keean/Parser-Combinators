@@ -1,8 +1,8 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include "templateio.h"
-#include "parser-combinators.h"
+#include "templateio.hpp"
+#include "parser_combinators.hpp"
 
 using namespace std;
 

@@ -8,7 +8,7 @@
 #include <vector>
 #include <tuple>
 #include <type_traits>
-#include "function-traits.h"
+#include "function_traits.hpp"
 
 using namespace std;
 
