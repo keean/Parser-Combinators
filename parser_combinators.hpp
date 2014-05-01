@@ -161,6 +161,7 @@ struct parse_error : public runtime_error {
 
 class fparse {
     istream &in;
+    int count;
     int row;
     int col;
     int sym;
@@ -180,6 +181,11 @@ public:
         } else if (::isprint(sym)) {
             ++col;
         }
+        ++count;
+    }
+
+    int get_count() {
+        return count;
     }
 
     int get_col() {
