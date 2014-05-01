@@ -400,8 +400,7 @@ public:
     using is_parser_type = true_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
 
-    combinator_choice(Parser1 const& p1, Parser2 const& p2)
-        : p1(p1), p2(p2) {}
+    combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
     template <typename Result_Type>
     bool operator() (fparse &in, Result_Type *result = nullptr) const {
@@ -428,8 +427,7 @@ public:
     using is_parser_type = true_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
 
-    combinator_sequence(Parser1 const& p1, Parser2 const& p2)
-        : p1(p1), p2(p2) {}
+    combinator_sequence(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
     template <typename Result_Type>
     bool operator() (fparse &in, Result_Type *result = nullptr) const {
