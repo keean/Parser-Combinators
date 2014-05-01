@@ -334,7 +334,7 @@ struct parser_fail {
 } const fail;
 
 //============================================================================
-// Lifting String Recognisers to Parsers, and Parsers up one level: fmap
+// Lifting String Recognisers to Parsers, and Parsers up one level: any, all
 
 //----------------------------------------------------------------------------
 // as soon as one parser succeeds, pass result to user supplied functor
