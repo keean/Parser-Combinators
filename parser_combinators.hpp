@@ -160,21 +160,22 @@ struct parse_error : public runtime_error {
 };
 
 class fparse {
-    istream &in;
+    streambuf* in;
     int count;
     int row;
     int col;
     int sym;
 
 public:
-    fparse(istream &f) : in(f), row(1), col(1), sym(f.get()) {}
+    fparse(istream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sgetc()) {}
 
     void error(string const& err, string const& exp) {
         throw parse_error(err, row, col, exp, sym);
     }
 
     void next() {
-        sym = in.get();
+        in->snextc();
+        sym = in->sgetc();
         if (sym == '\n') {
             ++row;
             col = 0;
