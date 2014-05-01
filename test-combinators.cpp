@@ -7,49 +7,26 @@
 using namespace std;
 
 //----------------------------------------------------------------------------
-// Example CSV file parser, calculates average and variance for each line in
-// an integer CSV file:
+// Example CSV file parser.
 
-// result type
-struct stats {
-    int n;
-    int sum;
-    int sum2;
-};
-
-ostream& operator<< (ostream &out, stats const& s) {
-    double const num = static_cast<double>(s.n);
-    double const avg = static_cast<double>(s.sum) / num;
-    double const var = static_cast<double>(s.sum2) / num - avg;
-    return cout << "{num = " << num << ", avg = " << avg << ", var = " << var << "}";
-}
-
-// function to fold stats into a vector
-template <typename T> struct vec {
-    vec() {};
-    void operator() (vector<T> *ts, T &t) const {
-        ts->push_back(t);
+struct parse_int {
+    parse_int() {};
+    void operator() (vector<int> *ts, string &num, string &sep) const {
+        ts->push_back(stoi(num));
     }
-};
+} const parse_int;
 
-auto const vec_stats = vec<stats>() ;
-
-// functon to fold CSV lines into sum and sum-of-squares.
-struct acc {
-    acc() {};
-    void operator() (stats *s, string &t) const {
-        int const i = stoi(t);
-        s->n += 1;
-        s->sum += i;
-        s->sum2 += i * i;
+struct parse_line {
+    parse_line() {}
+    void operator() (vector<vector<int>> *ts, vector<int> &line, string &line_sep) const {
+        ts->push_back(move(line));
     }
-} const acc;
+} const parse_line;
 
-auto const recognise_number = many(accept(is_digit));
-auto const recognise_space = many(accept(is_space));
+auto const recognise_number = some(accept(is_digit));
+auto const recognise_space = some(accept(is_space));
 auto const recognise_separator = option(accept(is_char(',')) && discard(option(recognise_space)));
-//auto const parse_csv = fold(vec_stats, fold(acc, recognise_number && discard(recognise_separator)) && discard(option(recognise_space)));
-auto const parse_csv = many(push(many(push(seq(recognise_number, recognise_separator))) && discard(option(recognise_space))));
+auto const parse_csv = some(fmap(parse_line, some(fmap(parse_int, recognise_number, recognise_separator)), option(recognise_space)));
 
 class csv_parser {
     fparse in;
