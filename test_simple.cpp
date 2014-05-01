@@ -34,7 +34,7 @@ struct csv_parser : private fparse {
         return result.size() > 0;
     }
 
-    void operator() () {
+    int operator() () {
         vector<vector<int>> a;
 
         if (parse_csv(a)) {
@@ -43,7 +43,7 @@ struct csv_parser : private fparse {
             cout << "FAIL\n";
         }
         
-        cout << "lines: " << a.size() << "\n";
+        return get_count(); 
     }
 };
 
@@ -61,8 +61,9 @@ int main(int const argc, char const *argv[]) {
                 if (in.is_open()) {
                     csv_parser csv(in);
                     profile<csv_parser>::reset();
-                    csv();
-                    cout << "time: " << profile<csv_parser>::report() << "us\n";
+                    int const chars_read = csv();
+                    double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<csv_parser>::report());
+                    cout << "parsed: " << mb_per_s << "MB/s\n";
                 }
             } catch (parse_error& e) {
                 cerr << argv[i] << ": " << e.what()

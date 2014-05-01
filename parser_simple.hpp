@@ -116,6 +116,7 @@ struct parse_error : public runtime_error {
 
 class fparse {
     fstream &in;
+    int count;
     int row;
     int col;
     int sym;
@@ -132,6 +133,7 @@ class fparse {
         } else if (::isprint(sym)) {
             ++col;
         }
+        ++count;
     }
 
 public:
@@ -144,6 +146,10 @@ protected:
     
     int get_row() {
         return row;
+    }
+
+    int get_count() {
+        return count;
     }
     
     bool accept(char_pred const &t, string *s = nullptr) {
