@@ -11,7 +11,7 @@ using namespace std;
 // Example CSV file parser.
 
 struct parse_int {
-    parse_int() {};
+    parse_int() {}
     void operator() (vector<int> *ts, string &num, string &sep) const {
         ts->push_back(stoi(num));
     }
