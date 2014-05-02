@@ -3,7 +3,7 @@
 // compile with -std=gnu++11 
 // parser_simple.hpp
 
-#include <fstream>
+#include <istream>
 #include <stdexcept>
 
 using namespace std;
@@ -93,7 +93,7 @@ class is_not : public char_pred {
     char_pred const &a;
 
 public:
-    is_not(char_pred const &a) 
+    explicit is_not(char_pred const &a) 
         : a(a), char_pred("~" + a.name) {}
     bool operator() (int const c) const {
         return !a(c);
@@ -114,7 +114,7 @@ struct parse_error : public runtime_error {
         : runtime_error(what), row(row), col(col), exp(move(exp)), sym(sym) {}
 };
 
-class fparse {
+class parser {
     streambuf *in;
     int count;
     int row;
@@ -138,7 +138,7 @@ class fparse {
     }
 
 public:
-    fparse(fstream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sbumpc()) {}
+    parser(istream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sbumpc()) {}
 
 protected:
     int get_col() {

@@ -87,6 +87,9 @@ struct is_print {
     }
 } const is_print;
 
+//----------------------------------------------------------------------------
+// Any single character
+
 class is_char {
     int const k;
 
@@ -103,7 +106,7 @@ public:
 is_char const is_eof(EOF);
 
 //----------------------------------------------------------------------------
-// Combining character predicates: ||, ~
+// Combining character predicates
 
 template <typename P1, typename P2> class is_either {
     P1 const p1;
@@ -159,7 +162,7 @@ struct parse_error : public runtime_error {
         : runtime_error(what), row(row), col(col), exp(exp), sym(sym) {}
 };
 
-class fparse {
+class pstream {
     streambuf* in;
     int count;
     int row;
@@ -167,7 +170,7 @@ class fparse {
     int sym;
 
 public:
-    fparse(istream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sbumpc()) {}
+    pstream(istream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sbumpc()) {}
 
     void error(string const& err, string const& exp) {
         throw parse_error(err, row, col, exp, sym);
@@ -259,7 +262,7 @@ public:
 
     explicit recogniser_accept(Predicate const& p) : p(p) {}
 
-    bool operator() (fparse &in, string *result = nullptr) const {
+    bool operator() (pstream &in, string *result = nullptr) const {
         int const sym = in.get_sym();
         if (!p(sym)) {
             return false;
@@ -289,7 +292,7 @@ public:
 
     explicit recogniser_expect(Predicate const& p) : p(p) {}
 
-    bool operator() (fparse &in, string *result = nullptr) const {
+    bool operator() (pstream &in, string *result = nullptr) const {
         int const sym = in.get_sym();
         if (!p(sym)) {
             in.error("expected", p.name);
@@ -317,10 +320,10 @@ struct parser_succ {
     using is_parser_type = true_type;
     using result_type = void;
 
-    explicit parser_succ() {}
+    parser_succ() {}
 
     template <typename Result_Type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
         return true;
     }
 } const succ;
@@ -332,10 +335,10 @@ struct parser_fail {
     using is_parser_type = true_type;
     using result_type = void;
 
-    explicit parser_fail() {}
+    parser_fail() {}
 
     template <typename Result_Type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
         return false;
     }
 } const fail;
@@ -354,7 +357,7 @@ template <typename Functor, typename... Parsers> class fmap_choice {
     Functor const f;
 
     template <typename Rs, size_t I0, size_t... Is> 
-    int any_parsers(fparse &in, Rs &rs, size_t, size_t is...) const {
+    int any_parsers(pstream &in, Rs &rs, size_t, size_t is...) const {
         if (get<I0>(ps)(in, &get<I0>(rs))) {
             return I0;
         }
@@ -362,7 +365,7 @@ template <typename Functor, typename... Parsers> class fmap_choice {
     }
 
     template <typename Rs, size_t I0>
-    int any_parsers(fparse &in, Rs &rs, size_t) const {
+    int any_parsers(pstream &in, Rs &rs, size_t) const {
         if (get<I0>(ps)(in, &get<I0>(rs))) {
             return I0;
         }
@@ -370,7 +373,7 @@ template <typename Functor, typename... Parsers> class fmap_choice {
     }
 
     template <typename Result_Type, size_t... I> 
-    bool fmap_any(fparse &in, size_sequence<I...> seq, Result_Type *result) const {
+    bool fmap_any(pstream &in, size_sequence<I...> seq, Result_Type *result) const {
         tmp_type tmp {};
         int const i = any_parsers<tmp_type, I...>(in, tmp, I...);
         if (i >= 0) {
@@ -384,10 +387,10 @@ public:
     using is_parser_type = true_type;
     using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
 
-    fmap_choice(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
+    explicit fmap_choice(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
 
     template <typename Result_Type, typename Is = typename range<0, sizeof...(Parsers)>::type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
         return fmap_any(in, Is(), result);
     }
 };
@@ -408,7 +411,7 @@ template <typename Functor, typename... Parsers> class fmap_sequence {
     Functor const f;
 
     template <typename Rs, size_t I0, size_t... Is> 
-    bool all_parsers(fparse &in, Rs &rs, size_t, size_t is...) const {
+    bool all_parsers(pstream &in, Rs &rs, size_t, size_t is...) const {
         if (get<I0>(ps)(in, &get<I0>(rs))) {
             return all_parsers<Rs, Is...>(in, rs, is);
         }
@@ -416,12 +419,12 @@ template <typename Functor, typename... Parsers> class fmap_sequence {
     }
 
     template <typename Rs, size_t I0>
-    bool all_parsers(fparse &in, Rs &rs, size_t) const {
+    bool all_parsers(pstream &in, Rs &rs, size_t) const {
         return get<I0>(ps)(in, &get<I0>(rs));
     }
 
     template <typename Result_Type, size_t... I> 
-    bool fmap_all(fparse &in, size_sequence<I...> seq, Result_Type *result) const {
+    bool fmap_all(pstream &in, size_sequence<I...> seq, Result_Type *result) const {
         tmp_type tmp {};
         if (all_parsers<tmp_type, I...>(in, tmp, I...)) {
             f(result, get<I>(tmp)...);
@@ -434,10 +437,10 @@ public:
     using is_parser_type = true_type;
     using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
 
-    fmap_sequence(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
+    explicit fmap_sequence(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
 
     template <typename Result_Type, typename Is = typename range<0, sizeof...(Parsers)>::type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
         return fmap_all(in, Is(), result);
     }
 };
@@ -464,7 +467,7 @@ public:
     combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
     template <typename Result_Type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
         return p1(in, result) || p2(in, result);
     }
 };
@@ -491,7 +494,7 @@ public:
     combinator_sequence(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
     template <typename Result_Type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
         return p1(in, result) && p2(in, result);
     }
 };
@@ -517,7 +520,7 @@ public:
     explicit combinator_many(Parser const& p) : p(p) {}
 
     template <typename Result_Type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
         while (p(in, result));
         return true;
     }
@@ -541,7 +544,7 @@ public:
     explicit combinator_discard(Parser const& p) : p(p) {}
 
     template <typename Result_Type>
-    bool operator() (fparse &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
         typename Parser::result_type *const discard_result = nullptr;
         return p(in, discard_result);
     }

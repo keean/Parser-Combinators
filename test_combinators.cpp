@@ -30,7 +30,7 @@ auto const recognise_separator = option(accept(is_char(',')) && discard(option(r
 auto const parse_csv = some(all(parse_line, some(all(parse_int, recognise_number, recognise_separator)), option(recognise_space)));
 
 class csv_parser {
-    fparse in;
+    pstream in;
 
 public:
     csv_parser(fstream &fs) : in(fs) {}

@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 #include <vector>
 #include "templateio.hpp"
@@ -8,9 +9,9 @@ using namespace std;
 
 //----------------------------------------------------------------------------
 
-struct csv_parser : private fparse {
+struct csv_parser : private parser {
 
-    csv_parser(fstream &in) : fparse(in) {}
+    csv_parser(istream &in) : parser(in) {}
 
     bool parse_csv(vector<vector<int>> &result) {
         profile<csv_parser> p;
