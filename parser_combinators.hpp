@@ -159,7 +159,7 @@ struct parse_error : public runtime_error {
     int const sym;
     string const exp;
     parse_error(string const& what, int row, int col, string const& exp, int sym)
-        : runtime_error(what), row(row), col(col), exp(exp), sym(sym) {}
+        : runtime_error(what), row(row), col(col), sym(sym), exp(exp) {}
 };
 
 class pstream {
@@ -170,7 +170,7 @@ class pstream {
     int sym;
 
 public:
-    pstream(istream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sbumpc()) {}
+    pstream(istream &f) : in(f.rdbuf()), count(0), row(1), col(1), sym(in->sbumpc()) {}
 
     void error(string const& err, string const& exp) {
         throw parse_error(err, row, col, exp, sym);
