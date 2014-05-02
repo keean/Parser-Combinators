@@ -13,26 +13,46 @@ struct csv_parser : private parser {
 
     csv_parser(istream &in) : parser(in) {}
 
+    bool separator(string *s = nullptr) {
+        accept(is_char(','), s) && space();
+        return true;
+    }
+
+    bool parse_int(vector<int> &ts) {
+        string n;
+        if (number(&n) && separator()) {
+            ts.push_back(stoi(n));
+            return true;
+        }
+        return false;
+    }
+
+    bool many_ints(vector<int> &ts) {
+        if (parse_int(ts)) {
+            while (parse_int(ts));
+            return true;
+        }
+        return false;
+    }
+
+    bool parse_line(vector<vector<int>> &ts) {
+        vector<int> t {};
+        if (many_ints(t)) {
+            space();
+            ts.push_back(move(t));
+            return true;
+        }
+        return false;
+    }
+
     bool parse_csv(vector<vector<int>> &result) {
         profile<csv_parser> p;
 
-        do {
-            if (accept(is_char(EOF))) {
-                break;
-            }
-            vector<int> tmp;
-            do {
-                space();
-                string n;
-                if (number(&n)) {
-                    tmp.push_back(stoi(n));
-                } else {
-                    break;
-                }
-            } while(accept(is_char(',')));
-            result.push_back(move(tmp));
-        } while(accept(is_not(is_char(EOF))));
-        return result.size() > 0;
+        if (parse_line(result)) {
+            while (parse_line(result));
+            return true;
+        }
+        return false;
     }
 
     int operator() () {
@@ -43,6 +63,8 @@ struct csv_parser : private parser {
         } else {
             cout << "FAIL\n";
         }
+
+        // cout << a << "\n";
         
         return get_count(); 
     }

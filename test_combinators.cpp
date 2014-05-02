@@ -49,6 +49,8 @@ public:
         } else {
             cout << "FAIL\n";
         }
+
+        // cout << a << "\n";
         
         return in.get_count();
     }
