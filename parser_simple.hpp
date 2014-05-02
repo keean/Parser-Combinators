@@ -115,7 +115,7 @@ struct parse_error : public runtime_error {
 };
 
 class fparse {
-    fstream &in;
+    streambuf *in;
     int count;
     int row;
     int col;
@@ -126,18 +126,19 @@ class fparse {
     }
 
     void next() {
-        sym = in.get();
+        sym = in->sgetc();
+        in->snextc();
+        ++count;
         if (sym == '\n') {
             ++row;
             col = 1;
         } else if (::isprint(sym)) {
             ++col;
         }
-        ++count;
     }
 
 public:
-    fparse(fstream &f) : in(f), row(1), col(1), sym(f.get()) {}
+    fparse(fstream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sbumpc()) {}
 
 protected:
     int get_col() {

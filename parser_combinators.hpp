@@ -167,22 +167,22 @@ class fparse {
     int sym;
 
 public:
-    fparse(istream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sgetc()) {}
+    fparse(istream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sbumpc()) {}
 
     void error(string const& err, string const& exp) {
         throw parse_error(err, row, col, exp, sym);
     }
 
     void next() {
-        in->snextc();
         sym = in->sgetc();
+        in->snextc();
+        ++count;
         if (sym == '\n') {
             ++row;
             col = 0;
         } else if (::isprint(sym)) {
             ++col;
         }
-        ++count;
     }
 
     int get_count() {
