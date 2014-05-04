@@ -1,4 +1,4 @@
-all : test_simple test_combinators test.csv
+all : test_simple test_combinators test.csv example_expression
 
 test.csv:
 	printf "" > test.csv; \
@@ -17,4 +17,7 @@ test_combinators: test_combinators.cpp templateio.hpp parser_combinators.hpp fun
 
 test_simple: test_simple.cpp templateio.hpp parser_simple.hpp profile.hpp
 	clang++ -ggdb -march=native -O3 -flto -std=c++11 -o test_simple test_simple.cpp
+
+example_expression: example_expression.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp
+	clang++ -ggdb -march=native -O3 -flto -std=c++11 -o example_expression example_expression.cpp
 
