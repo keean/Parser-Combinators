@@ -357,11 +357,11 @@ template <typename Functor, typename... Parsers> class fmap_choice {
     Functor const f;
 
     template <typename Rs, size_t I0, size_t... Is> 
-    int any_parsers(pstream &in, Rs &rs, size_t, size_t is...) const {
+    int any_parsers(pstream &in, Rs &rs, size_t, size_t...) const {
         if (get<I0>(ps)(in, &get<I0>(rs))) {
             return I0;
         }
-        return any_parsers<Rs, Is...>(in, rs, is);
+        return any_parsers<Rs, Is...>(in, rs, Is...);
     }
 
     template <typename Rs, size_t I0>
@@ -377,7 +377,9 @@ template <typename Functor, typename... Parsers> class fmap_choice {
         tmp_type tmp {};
         int const i = any_parsers<tmp_type, I...>(in, tmp, I...);
         if (i >= 0) {
-            f(result, i, get<I>(tmp)...);
+            if (result != nullptr) {
+                f(result, i, get<I>(tmp)...);
+            }
             return true;
         }
         return false;
@@ -411,9 +413,9 @@ template <typename Functor, typename... Parsers> class fmap_sequence {
     Functor const f;
 
     template <typename Rs, size_t I0, size_t... Is> 
-    bool all_parsers(pstream &in, Rs &rs, size_t, size_t is...) const {
+    bool all_parsers(pstream &in, Rs &rs, size_t, size_t...) const {
         if (get<I0>(ps)(in, &get<I0>(rs))) {
-            return all_parsers<Rs, Is...>(in, rs, is);
+            return all_parsers<Rs, Is...>(in, rs, Is...);
         }
         return false;
     }
@@ -427,7 +429,9 @@ template <typename Functor, typename... Parsers> class fmap_sequence {
     bool fmap_all(pstream &in, size_sequence<I...> seq, Result_Type *result) const {
         tmp_type tmp {};
         if (all_parsers<tmp_type, I...>(in, tmp, I...)) {
-            f(result, get<I>(tmp)...);
+            if (result != nullptr) {
+                f(result, get<I>(tmp)...);
+            }
             return true;
         }
         return false;
