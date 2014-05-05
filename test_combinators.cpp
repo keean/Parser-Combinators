@@ -12,15 +12,15 @@ using namespace std;
 
 struct parse_int {
     parse_int() {}
-    void operator() (vector<int> *ts, string &num, string &sep) const {
+    void operator() (vector<int> *ts, string const& num, string const& sep) const {
         ts->push_back(stoi(num));
     }
 } const parse_int;
 
 struct parse_line {
     parse_line() {}
-    void operator() (vector<vector<int>> *ts, vector<int> &line, string &line_sep) const {
-        ts->push_back(move(line));
+    void operator() (vector<vector<int>> *ts, vector<int> &line, string const& line_sep) const {
+        ts->push_back(move(line)); // move modifies 'line' so don't make it const
     }
 } const parse_line;
 

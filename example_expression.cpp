@@ -14,14 +14,17 @@ enum op {add = 0, sub = 1, mul = 2, div = 3};
 
 struct return_int {
     return_int() {}
-    void operator() (int *res, string &num) const {
+    void operator() (int *res, string const& num) const {
         *res = stoi(num);
     }
 } const return_int;
 
 struct return_op {
     return_op() {}
-    void operator() (enum op *res, int choice, string &add, string &sub, string &mul, string &div) const {
+    void operator() (
+        enum op *res, int choice, string const& add,
+        string const& sub, string const& mul, string const& div
+    ) const {
         *res = static_cast<enum op>(choice);
     }
 } const return_op;
@@ -34,7 +37,7 @@ struct state {
 struct return_left {
     state &s;
     return_left(state &s) : s(s) {}
-    void operator() (int *res, int &left) const {
+    void operator() (int *res, int left) const {
         s.acc = left;
         *res = s.acc;
     }
@@ -43,7 +46,7 @@ struct return_left {
 struct return_right {
     state &s;
     return_right(state &s) : s(s) {}
-    void operator() (int *res, enum op &opr, int &right) const {
+    void operator() (int *res, enum op opr, int right) const {
         switch (opr) {
             case op::add:
                 s.acc += right;
