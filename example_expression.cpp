@@ -29,47 +29,40 @@ struct return_op {
     }
 } const return_op;
 
-struct state {
-    int acc;
-    state() {};
-};
-
 struct return_left {
-    state &s;
-    return_left(state &s) : s(s) {}
+    return_left() {}
     void operator() (int *res, int left) const {
-        s.acc = left;
-        *res = s.acc;
+        *res = left;
     }
-};
+} const return_left;
 
 struct return_right {
-    state &s;
-    return_right(state &s) : s(s) {}
+    return_right() {}
     void operator() (int *res, enum op opr, int right) const {
         switch (opr) {
             case op::add:
-                s.acc += right;
+                *res += right;
                 break;
             case op::sub:
-                s.acc -= right;
+                *res -= right;
                 break;
             case op::mul:
-                s.acc *= right;
+                *res *= right;
                 break;
             case op::div:
-                s.acc /= right;
+                *res /= right;
                 break;
         }
-        *res = s.acc;
     }
-};
+} const return_right;
 
 auto const recognise_number = some(accept(is_digit));
 auto const recognise_space = many(accept(is_space));
 auto const parse_operand = all(return_int, recognise_number) && discard(recognise_space);
 auto const parse_operator = any(return_op, accept(is_char('+')), accept(is_char('-')),
     accept(is_char('*')), accept(is_char('/'))) && discard(recognise_space);
+auto const parse = discard(recognise_space) && all(return_left, parse_operand)
+    && many(all(return_right, parse_operator, parse_operand));
 
 class csv_parser {
     pstream in;
@@ -78,10 +71,6 @@ public:
     csv_parser(fstream &fs) : in(fs) {}
 
     int operator() () {
-        state my_state;
-        return_left my_left(my_state);
-        return_right my_right(my_state);
-        auto const parse = discard(recognise_space) && all(my_left, parse_operand) && many(all(my_right, parse_operator, parse_operand));
         decltype(parse)::result_type a; 
 
         bool b;
