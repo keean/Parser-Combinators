@@ -8,7 +8,7 @@
 using namespace std;
 
 //----------------------------------------------------------------------------
-// Example CSV file parser.
+// Example Expression Evaluating File Parser.
 
 enum op {add = 0, sub = 1, mul = 2, div = 3};
 
@@ -78,7 +78,7 @@ public:
         state my_state;
         return_left my_left(my_state);
         return_right my_right(my_state);
-        auto const parse = all(my_left, parse_operand) && many(all(my_right, parse_operator, parse_operand));
+        auto const parse = discard(recognise_space) && all(my_left, parse_operand) && many(all(my_right, parse_operator, parse_operand));
         decltype(parse)::result_type a; 
 
         bool b;
