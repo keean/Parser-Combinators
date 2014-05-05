@@ -58,11 +58,10 @@ struct return_right {
 
 auto const recognise_number = some(accept(is_digit));
 auto const recognise_space = many(accept(is_space));
-auto const parse_operand = all(return_int, recognise_number) && discard(recognise_space);
-auto const parse_operator = any(return_op, accept(is_char('+')), accept(is_char('-')),
-    accept(is_char('*')), accept(is_char('/'))) && discard(recognise_space);
-auto const parse = discard(recognise_space) && all(return_left, parse_operand)
-    && many(all(return_right, parse_operator, parse_operand));
+auto const parse_operand = discard(recognise_space) && all(return_int, recognise_number);
+auto const parse_operator = discard(recognise_space) && any(return_op, accept(is_char('+')), accept(is_char('-')),
+    accept(is_char('*')), accept(is_char('/')));
+auto const parse = all(return_left, parse_operand) && many(all(return_right, parse_operator, parse_operand));
 
 class csv_parser {
     pstream in;
