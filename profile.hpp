@@ -3,6 +3,12 @@
 // compile with c++ -std=c++11 
 // profile.h
 
+#include <ctime>
+
+extern "C" {
+    #include <sys/resource.h>
+}
+
 inline uint64_t rtime() {
     struct rusage rusage;
     getrusage(RUSAGE_SELF, &rusage);
