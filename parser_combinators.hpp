@@ -8,6 +8,8 @@
 #include <vector>
 #include <tuple>
 #include <type_traits>
+#include <memory>
+#include <cassert>
 #include "function_traits.hpp"
 
 using namespace std;
@@ -557,6 +559,222 @@ public:
 template <typename P, typename = typename P::is_parser_type>
 combinator_discard<P> const discard(P const& p) {
     return combinator_discard<P>(p);
+}
+
+//============================================================================
+// Run-time polymorphism
+
+//----------------------------------------------------------------------------
+// Handle: holds a runtime-polymorphic parser. It is mutable so that it can be
+// defined before the parser is assigned.
+
+template <typename Result_Type>
+class parser_handle {
+    static int next_id;
+    int id; 
+
+    struct holder_base {
+        virtual ~holder_base() {}
+        virtual bool parse(pstream &in, Result_Type *result = nullptr) const = 0;
+    }; 
+
+    template <typename Parser>
+    class holder_poly : public holder_base {
+        Parser const p;
+
+    public:
+        explicit holder_poly(Parser const &p) : p(p) {}
+        explicit holder_poly(Parser &&q) : p(forward<Parser>(q)) {}
+
+        virtual bool parse(pstream &in, Result_Type *result) const override {
+            cout << "POLY CALL\n";
+            return p(in, result);
+        }
+    };
+
+    shared_ptr<holder_base const> p;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = Result_Type;
+
+    parser_handle() : id(++next_id){
+        cout << "HANDLE (" << id << ") NEW\n";
+    }
+    ~parser_handle() {
+        cout << "HANDLE (" << id << ") DEL\n";
+    }
+
+    template <typename P, typename = typename P::is_parser_type>
+    parser_handle(P const &q) : id(++next_id), p(new holder_poly<P>(q)) {
+        cout << "HANDLE (" << id << ") COPY PARSER\n";
+    }
+
+    parser_handle(parser_handle const &q) : id(++next_id), p(q.p) {
+        cout << "HANDLE (" << id << ") COPY HANDLE (" << q.id << ")\n";
+    }
+
+    template <typename P, typename = typename P::is_parser_type>
+    parser_handle(P &&q) : id(++next_id), p(new holder_poly<P>(forward<P>(q))) {
+        cout << "HANDLE (" << id << ") MOVE PARSER\n";
+    }
+
+    parser_handle(parser_handle &&q) : id(++next_id), p(move(q.p)) {
+        cout << "HANDLE (" << id << ") MOVE HANDLE (" << q.id << ")\n";
+    }
+
+    template <typename P, typename = typename P::is_parser_type>
+    parser_handle& operator= (P const &q) {
+        cout << "HANDLE (" << id << ") := PARSER\n";
+        p = shared_ptr<holder_base const>(new holder_poly<P>(q));
+        return *this;
+    }
+
+    parser_handle& operator= (parser_handle const &q) {
+        cout << "HANDLE (" << id << ") := HANDLE (" << q.id << ")\n";
+        p = q.p;
+        return *this;
+    }
+
+    template <typename P, typename = typename P::is_parser_type>
+    parser_handle& operator= (P &&q) {
+        cout << "HANDLE (" << id << ") := MOVE PARSER\n";
+        p = shared_ptr<holder_base const>(new holder_poly<P>(forward<P>(q)));
+        return *this;
+    }
+
+    parser_handle& operator= (parser_handle &&q) {
+        cout << "HANDLE (" << id << ") := MOVE HANDLE (" << q.id << ")\n";
+        p = move(q.p);
+        return *this;
+    }
+
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+        cout << "HANDLE (" << id << ") CALL\n";
+        assert(p != nullptr);
+        return p->parse(in, result);
+    }
+};
+
+template <typename Result_Type> int parser_handle<Result_Type>::next_id = 0;
+
+//----------------------------------------------------------------------------
+// Reference: because the handle is mutable it breaks the assumptions of the
+// static const parser combinators (which take a copy of the argument parsers).
+// As such the combinators would take a copy of the unassigned empty handle, 
+// before it gets assigned the parser. The reference provides a const container that
+// is copied by the parser combinators, so that when the handle is assigned they
+// see the change.
+
+/*
+template <typename T, typename = void> struct is_ref {
+    static constexpr bool value = false;
+};
+
+template <typename T> struct is_ref<T, typename T::is_reference_type> {
+    static constexpr bool value = true;
+};
+*/
+
+template <typename Result_Type>
+class parser_reference {
+    static int next_id;
+    int id; 
+
+    shared_ptr<parser_handle<Result_Type>> const p;
+
+public:
+    //using is_reference_type = true_type;
+    using is_parser_type = true_type;
+    using result_type = Result_Type;
+
+    parser_reference() : id(++next_id), p(new parser_handle<Result_Type>()) {
+        cout << "REFERENCE (" << id << ") NEW\n";
+    }
+    ~parser_reference() {
+        cout << "REFERENCE (" << id << ") DEL\n";
+    }
+
+    template <typename P, typename = typename P::is_parser_type>
+    parser_reference(P const &q) : id(++next_id), p(new parser_handle<Result_Type>(q)) {
+        cout << "REFERENCE (" << id << ") COPY PARSER\n";
+    }
+
+    parser_reference(parser_reference const &q) : id(++next_id), p(q.p) {
+        cout << "REFERENCE (" << id << ") COPY REFERENCE (" << q.id << ")\n";
+    }
+
+    template <typename P, typename = typename P::is_parser_type>
+    parser_reference(P &&q) : id(++next_id), p(new parser_handle<Result_Type>(forward<P>(q))) {
+        cout << "REFERENCE (" << id << ") MOVE PARSER\n";
+    }
+
+    parser_reference(parser_reference &&q) : id(++next_id), p(move(q.p)) {
+        cout << "REFERENCE (" << id << ") MOVE REFERENCE (" << q.id << ")\n";
+    }
+
+    template <typename P
+        ,typename = typename P::is_parser_type
+        //,typename = typename enable_if<!is_ref<P>::value>::type
+        >
+    parser_reference const& operator= (P const &q) const {
+        cout << "REFERENCE (" << id << ") := PARSER\n";
+        *p = q;
+        return *this;
+    }
+
+    parser_reference const& operator= (parser_reference const &q) const {
+        cout << "REFERENCE (" << id << ") := REFERENCE (" << q.id << ")\n";
+        *p = *(q.p);
+        return *this;
+    }
+
+    template <typename P, typename = typename P::is_parser_type>
+    parser_reference const& operator= (P &&q) const {
+        cout << "REFERENCE (" << id << ") := MOVE PARSER\n";
+        *p = forward<P>(q);
+        return *this;
+    }
+
+    /*
+    parser_reference const& operator= (parser_reference &&q) const {
+        cout << "REFERENCE (" << id << ") := MOVE REFERENCE (" << q.id << ")\n";
+        *p = *(q.p);
+        return *this;
+    }
+    */
+
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+        cout << "REFERENCE (" << id << ") CALL\n";
+        assert(p != nullptr);
+        return (*p)(in, result);
+    }
+};
+
+template <typename Result_Type> int parser_reference<Result_Type>::next_id = 0;
+
+//----------------------------------------------------------------------------
+// This is an alternative reference that still works when the self-reference is
+// on a single line definition. Ideally this would be combined with the above.
+
+template <typename Parser>
+class parser_ref {
+    Parser &p;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = typename Parser::result_type;
+
+    parser_ref(Parser &q) : p(q) {}
+
+    template <typename Result_Type>
+    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+        return p(in, result);
+    }
+};
+
+template <typename P> parser_ref<P> reference(P &p) {
+    return parser_ref<P>(p);
 }
 
 //============================================================================

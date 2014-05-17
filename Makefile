@@ -10,7 +10,7 @@ test.csv:
 	done;
 
 clean:
-	rm -f test_combinators test_simple
+	rm -f test_combinators test_simple example_expression
 
 test_combinators: test_combinators.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp
 	clang++ -ggdb -march=native -O3 -flto -std=c++11 -o test_combinators test_combinators.cpp
