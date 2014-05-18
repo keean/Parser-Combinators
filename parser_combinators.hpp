@@ -600,12 +600,12 @@ public:
     template <typename P, typename = typename P::is_parser_type>
     parser_handle(P const &q) : p(new holder_poly<P>(q)) {} 
 
-    parser_handle(parser_handle const &q) : p(q.p) {}
+    explicit parser_handle(parser_handle const &q) : p(q.p) {}
 
     template <typename P, typename = typename P::is_parser_type>
     parser_handle(P &&q) : p(new holder_poly<P>(forward<P>(q))) {}
 
-    parser_handle(parser_handle &&q) : p(move(q.p)) {}
+    explicit parser_handle(parser_handle &&q) : p(move(q.p)) {}
 
     template <typename P, typename = typename P::is_parser_type>
     parser_handle& operator= (P const &q) {
@@ -660,12 +660,12 @@ public:
     template <typename P, typename = typename P::is_parser_type>
     parser_reference(P const &q) : p(new parser_handle<Result_Type>(q)) {}
 
-    parser_reference(parser_reference const &q) : p(q.p) {}
+    explicit parser_reference(parser_reference const &q) : p(q.p) {}
 
     template <typename P, typename = typename P::is_parser_type>
     parser_reference(P &&q) : p(new parser_handle<Result_Type>(forward<P>(q))) {}
 
-    parser_reference(parser_reference &&q) : p(move(q.p)) {}
+    explicit parser_reference(parser_reference &&q) : p(move(q.p)) {}
 
     template <typename P, typename = typename P::is_parser_type>
     parser_reference const& operator= (P const &q) const {
@@ -702,13 +702,13 @@ public:
 
 template <typename Parser>
 class parser_ref {
-    Parser &p;
+    Parser const& p;
 
 public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
 
-    parser_ref(Parser &q) : p(q) {}
+    explicit parser_ref(Parser &q) : p(q) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         return p(in, result);
