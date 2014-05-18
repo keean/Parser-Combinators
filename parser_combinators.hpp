@@ -324,8 +324,7 @@ struct parser_succ {
 
     parser_succ() {}
 
-    template <typename Result_Type>
-    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, void *result = nullptr) const {
         return true;
     }
 } const succ;
@@ -339,8 +338,7 @@ struct parser_fail {
 
     parser_fail() {}
 
-    template <typename Result_Type>
-    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, void *result = nullptr) const {
         return false;
     }
 } const fail;
@@ -355,6 +353,12 @@ template <typename Functor, typename... Parsers> class fmap_choice {
     using functor_traits = function_traits<Functor>;
     using tuple_type = tuple<Parsers...>;
     using tmp_type = tuple<typename Parsers::result_type...>;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
+
+private:
     tuple_type const ps;
     Functor const f;
 
@@ -374,8 +378,8 @@ template <typename Functor, typename... Parsers> class fmap_choice {
         return -1;
     }
 
-    template <typename Result_Type, size_t... I> 
-    bool fmap_any(pstream &in, size_sequence<I...> seq, Result_Type *result) const {
+    template <size_t... I> 
+    bool fmap_any(pstream &in, size_sequence<I...> seq, result_type *result) const {
         tmp_type tmp {};
         int const i = any_parsers<tmp_type, I...>(in, tmp, I...);
         if (i >= 0) {
@@ -388,13 +392,10 @@ template <typename Functor, typename... Parsers> class fmap_choice {
     }
 
 public:
-    using is_parser_type = true_type;
-    using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
-
     explicit fmap_choice(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
 
-    template <typename Result_Type, typename Is = typename range<0, sizeof...(Parsers)>::type>
-    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+    template <typename Is = typename range<0, sizeof...(Parsers)>::type>
+    bool operator() (pstream &in, result_type *result = nullptr) const {
         return fmap_any(in, Is(), result);
     }
 };
@@ -411,6 +412,12 @@ template <typename Functor, typename... Parsers> class fmap_sequence {
     using functor_traits = function_traits<Functor>;
     using tuple_type = tuple<Parsers...>;
     using tmp_type = tuple<typename Parsers::result_type...>;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
+
+private:
     tuple_type const ps;
     Functor const f;
 
@@ -427,8 +434,8 @@ template <typename Functor, typename... Parsers> class fmap_sequence {
         return get<I0>(ps)(in, &get<I0>(rs));
     }
 
-    template <typename Result_Type, size_t... I> 
-    bool fmap_all(pstream &in, size_sequence<I...> seq, Result_Type *result) const {
+    template <size_t... I> 
+    bool fmap_all(pstream &in, size_sequence<I...> seq, result_type *result) const {
         tmp_type tmp {};
         if (all_parsers<tmp_type, I...>(in, tmp, I...)) {
             if (result != nullptr) {
@@ -440,13 +447,10 @@ template <typename Functor, typename... Parsers> class fmap_sequence {
     }
 
 public:
-    using is_parser_type = true_type;
-    using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
-
     explicit fmap_sequence(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
 
-    template <typename Result_Type, typename Is = typename range<0, sizeof...(Parsers)>::type>
-    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+    template <typename Is = typename range<0, sizeof...(Parsers)>::type>
+    bool operator() (pstream &in, result_type *result = nullptr) const {
         return fmap_all(in, Is(), result);
     }
 };
@@ -472,8 +476,7 @@ public:
 
     combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
-    template <typename Result_Type>
-    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, result_type *result = nullptr) const {
         return p1(in, result) || p2(in, result);
     }
 };
@@ -499,8 +502,7 @@ public:
 
     combinator_sequence(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
-    template <typename Result_Type>
-    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, result_type *result = nullptr) const {
         return p1(in, result) && p2(in, result);
     }
 };
@@ -525,8 +527,7 @@ public:
 
     explicit combinator_many(Parser const& p) : p(p) {}
 
-    template <typename Result_Type>
-    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, result_type *result = nullptr) const {
         while (p(in, result));
         return true;
     }
@@ -549,8 +550,7 @@ public:
 
     explicit combinator_discard(Parser const& p) : p(p) {}
 
-    template <typename Result_Type>
-    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, result_type *result = nullptr) const {
         typename Parser::result_type *const discard_result = nullptr;
         return p(in, discard_result);
     }
@@ -570,8 +570,6 @@ combinator_discard<P> const discard(P const& p) {
 
 template <typename Result_Type>
 class parser_handle {
-    static int next_id;
-    int id; 
 
     struct holder_base {
         virtual ~holder_base() {}
@@ -587,7 +585,6 @@ class parser_handle {
         explicit holder_poly(Parser &&q) : p(forward<Parser>(q)) {}
 
         virtual bool parse(pstream &in, Result_Type *result) const override {
-            cout << "POLY CALL\n";
             return p(in, result);
         }
     };
@@ -598,65 +595,45 @@ public:
     using is_parser_type = true_type;
     using result_type = Result_Type;
 
-    parser_handle() : id(++next_id){
-        cout << "HANDLE (" << id << ") NEW\n";
-    }
-    ~parser_handle() {
-        cout << "HANDLE (" << id << ") DEL\n";
-    }
+    parser_handle() {}
 
     template <typename P, typename = typename P::is_parser_type>
-    parser_handle(P const &q) : id(++next_id), p(new holder_poly<P>(q)) {
-        cout << "HANDLE (" << id << ") COPY PARSER\n";
-    }
+    parser_handle(P const &q) : p(new holder_poly<P>(q)) {} 
 
-    parser_handle(parser_handle const &q) : id(++next_id), p(q.p) {
-        cout << "HANDLE (" << id << ") COPY HANDLE (" << q.id << ")\n";
-    }
+    parser_handle(parser_handle const &q) : p(q.p) {}
 
     template <typename P, typename = typename P::is_parser_type>
-    parser_handle(P &&q) : id(++next_id), p(new holder_poly<P>(forward<P>(q))) {
-        cout << "HANDLE (" << id << ") MOVE PARSER\n";
-    }
+    parser_handle(P &&q) : p(new holder_poly<P>(forward<P>(q))) {}
 
-    parser_handle(parser_handle &&q) : id(++next_id), p(move(q.p)) {
-        cout << "HANDLE (" << id << ") MOVE HANDLE (" << q.id << ")\n";
-    }
+    parser_handle(parser_handle &&q) : p(move(q.p)) {}
 
     template <typename P, typename = typename P::is_parser_type>
     parser_handle& operator= (P const &q) {
-        cout << "HANDLE (" << id << ") := PARSER\n";
         p = shared_ptr<holder_base const>(new holder_poly<P>(q));
         return *this;
     }
 
     parser_handle& operator= (parser_handle const &q) {
-        cout << "HANDLE (" << id << ") := HANDLE (" << q.id << ")\n";
         p = q.p;
         return *this;
     }
 
     template <typename P, typename = typename P::is_parser_type>
     parser_handle& operator= (P &&q) {
-        cout << "HANDLE (" << id << ") := MOVE PARSER\n";
         p = shared_ptr<holder_base const>(new holder_poly<P>(forward<P>(q)));
         return *this;
     }
 
     parser_handle& operator= (parser_handle &&q) {
-        cout << "HANDLE (" << id << ") := MOVE HANDLE (" << q.id << ")\n";
         p = move(q.p);
         return *this;
     }
 
     bool operator() (pstream &in, Result_Type *result = nullptr) const {
-        cout << "HANDLE (" << id << ") CALL\n";
         assert(p != nullptr);
         return p->parse(in, result);
     }
 };
-
-template <typename Result_Type> int parser_handle<Result_Type>::next_id = 0;
 
 //----------------------------------------------------------------------------
 // Reference: because the handle is mutable it breaks the assumptions of the
@@ -666,96 +643,62 @@ template <typename Result_Type> int parser_handle<Result_Type>::next_id = 0;
 // is copied by the parser combinators, so that when the handle is assigned they
 // see the change.
 
-/*
-template <typename T, typename = void> struct is_ref {
-    static constexpr bool value = false;
-};
-
-template <typename T> struct is_ref<T, typename T::is_reference_type> {
-    static constexpr bool value = true;
-};
-*/
+// possibly depricated? Might be better to use handle (above) and reference
+// (below) consistently.
 
 template <typename Result_Type>
 class parser_reference {
-    static int next_id;
-    int id; 
 
     shared_ptr<parser_handle<Result_Type>> const p;
 
 public:
-    //using is_reference_type = true_type;
     using is_parser_type = true_type;
     using result_type = Result_Type;
 
-    parser_reference() : id(++next_id), p(new parser_handle<Result_Type>()) {
-        cout << "REFERENCE (" << id << ") NEW\n";
-    }
-    ~parser_reference() {
-        cout << "REFERENCE (" << id << ") DEL\n";
-    }
+    parser_reference() : p(new parser_handle<Result_Type>()) {}
 
     template <typename P, typename = typename P::is_parser_type>
-    parser_reference(P const &q) : id(++next_id), p(new parser_handle<Result_Type>(q)) {
-        cout << "REFERENCE (" << id << ") COPY PARSER\n";
-    }
+    parser_reference(P const &q) : p(new parser_handle<Result_Type>(q)) {}
 
-    parser_reference(parser_reference const &q) : id(++next_id), p(q.p) {
-        cout << "REFERENCE (" << id << ") COPY REFERENCE (" << q.id << ")\n";
-    }
+    parser_reference(parser_reference const &q) : p(q.p) {}
 
     template <typename P, typename = typename P::is_parser_type>
-    parser_reference(P &&q) : id(++next_id), p(new parser_handle<Result_Type>(forward<P>(q))) {
-        cout << "REFERENCE (" << id << ") MOVE PARSER\n";
-    }
+    parser_reference(P &&q) : p(new parser_handle<Result_Type>(forward<P>(q))) {}
 
-    parser_reference(parser_reference &&q) : id(++next_id), p(move(q.p)) {
-        cout << "REFERENCE (" << id << ") MOVE REFERENCE (" << q.id << ")\n";
-    }
+    parser_reference(parser_reference &&q) : p(move(q.p)) {}
 
-    template <typename P
-        ,typename = typename P::is_parser_type
-        //,typename = typename enable_if<!is_ref<P>::value>::type
-        >
+    template <typename P, typename = typename P::is_parser_type>
     parser_reference const& operator= (P const &q) const {
-        cout << "REFERENCE (" << id << ") := PARSER\n";
         *p = q;
         return *this;
     }
 
     parser_reference const& operator= (parser_reference const &q) const {
-        cout << "REFERENCE (" << id << ") := REFERENCE (" << q.id << ")\n";
         *p = *(q.p);
         return *this;
     }
 
     template <typename P, typename = typename P::is_parser_type>
     parser_reference const& operator= (P &&q) const {
-        cout << "REFERENCE (" << id << ") := MOVE PARSER\n";
         *p = forward<P>(q);
         return *this;
     }
 
-    /*
     parser_reference const& operator= (parser_reference &&q) const {
-        cout << "REFERENCE (" << id << ") := MOVE REFERENCE (" << q.id << ")\n";
         *p = *(q.p);
         return *this;
     }
-    */
 
     bool operator() (pstream &in, Result_Type *result = nullptr) const {
-        cout << "REFERENCE (" << id << ") CALL\n";
         assert(p != nullptr);
         return (*p)(in, result);
     }
 };
 
-template <typename Result_Type> int parser_reference<Result_Type>::next_id = 0;
-
 //----------------------------------------------------------------------------
 // This is an alternative reference that still works when the self-reference is
 // on a single line definition. Ideally this would be combined with the above.
+// (this can't be used on r-values).
 
 template <typename Parser>
 class parser_ref {
@@ -767,8 +710,7 @@ public:
 
     parser_ref(Parser &q) : p(q) {}
 
-    template <typename Result_Type>
-    bool operator() (pstream &in, Result_Type *result = nullptr) const {
+    bool operator() (pstream &in, result_type *result = nullptr) const {
         return p(in, result);
     }
 };
