@@ -76,12 +76,19 @@ auto const parse_operand = discard(recognise_space) && all(return_int, recognise
 auto const parse_operator = discard(recognise_space) && any(return_op,
     accept(is_char('+')), accept(is_char('-')), accept(is_char('*')), accept(is_char('/')));
 
-parser_reference<int> expression_parser;
-
-auto const expression = discard(recognise_start) && all(return_exp,
-        log("left", expression_parser || parse_operand),
+// method 1
+parser_reference<int> expression_parser1;
+auto const expression1 = discard(recognise_start) && all(return_exp,
+        log("left", expression_parser1 || parse_operand),
         log("op", parse_operator),
-        log("right", expression_parser || parse_operand)
+        log("right", expression_parser1 || parse_operand)
+    ) && discard(recognise_end);
+
+// method 2
+parser_handle<int> expression_parser2 = discard(recognise_start) && all(return_exp,
+        log("left", reference(expression_parser2) || parse_operand),
+        log("op", parse_operator),
+        log("right", reference(expression_parser2) || parse_operand)
     ) && discard(recognise_end);
 
 class csv_parser {
@@ -91,8 +98,11 @@ public:
     csv_parser(fstream &fs) : in(fs) {}
 
     int operator() () {
-        expression_parser = expression;
-        auto const parser = expression;
+        expression_parser1 = expression1; // only needed with method 1 we must tie the knot dynamically
+
+        // uncomment 1 as appropriate
+        //auto const parser = expression_parser1;
+        auto const parser = expression_parser2;
 
         decltype(parser)::result_type a {}; 
 
