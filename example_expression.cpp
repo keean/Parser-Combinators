@@ -10,7 +10,25 @@ using namespace std;
 //----------------------------------------------------------------------------
 // Example Expression Evaluating File Parser.
 
-enum op {add = 0, sub = 1, mul = 2, div = 3};
+enum class op {add = 0, sub = 1, mul = 2, div = 3};
+
+ostream& operator<< (ostream &in, op opr) {
+    switch (opr) {
+        case op::add:
+            in << " + ";
+            break;
+        case op::sub:
+            in << " - ";
+            break;
+        case op::mul:
+            in << " * ";
+            break;
+        case op::div:
+            in << " / ";
+            break;
+    }
+    return in;
+}
 
 struct return_int {
     return_int() {}
@@ -29,39 +47,42 @@ struct return_op {
     }
 } const return_op;
 
-struct return_left {
-    return_left() {}
-    void operator() (int *res, int left) const {
-        *res = left;
-    }
-} const return_left;
-
-struct return_right {
-    return_right() {}
-    void operator() (int *res, enum op opr, int right) const {
+struct return_exp {
+    return_exp() {}
+    void operator() (int *res, int left, enum op opr, int right) const {
         switch (opr) {
             case op::add:
-                *res += right;
+                *res = left + right;
                 break;
             case op::sub:
-                *res -= right;
+                *res = left - right;
                 break;
             case op::mul:
-                *res *= right;
+                *res = left * right;
                 break;
             case op::div:
-                *res /= right;
+                *res = left / right;
                 break;
         }
     }
-} const return_right;
+} const return_exp;
 
 auto const recognise_number = some(accept(is_digit));
 auto const recognise_space = many(accept(is_space));
+auto const recognise_start = recognise_space && accept(is_char('('));
+auto const recognise_end = recognise_space && accept(is_char(')'));
+
 auto const parse_operand = discard(recognise_space) && all(return_int, recognise_number);
-auto const parse_operator = discard(recognise_space) && any(return_op, accept(is_char('+')), accept(is_char('-')),
-    accept(is_char('*')), accept(is_char('/')));
-auto const parse = all(return_left, parse_operand) && many(all(return_right, parse_operator, parse_operand));
+auto const parse_operator = discard(recognise_space) && any(return_op,
+    accept(is_char('+')), accept(is_char('-')), accept(is_char('*')), accept(is_char('/')));
+
+parser_reference<int> expression_parser;
+
+auto const expression = discard(recognise_start) && all(return_exp,
+        log("left", expression_parser || parse_operand),
+        log("op", parse_operator),
+        log("right", expression_parser || parse_operand)
+    ) && discard(recognise_end);
 
 class csv_parser {
     pstream in;
@@ -70,12 +91,15 @@ public:
     csv_parser(fstream &fs) : in(fs) {}
 
     int operator() () {
-        decltype(parse)::result_type a; 
+        expression_parser = expression;
+        auto const parser = expression;
+
+        decltype(parser)::result_type a {}; 
 
         bool b;
         {
             profile<csv_parser> p;
-            b = parse(in, &a);
+            b = parser(in, &a);
         }
 
         if (b) {
