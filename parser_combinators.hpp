@@ -719,6 +719,40 @@ template <typename P> parser_ref<P> reference(P &p) {
     return parser_ref<P>(p);
 }
 
+template <typename Parser> 
+class parser_log {
+    Parser const p;
+    string const msg;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = typename Parser::result_type;
+
+    explicit parser_log(string const& s, Parser const& q) : p(q), msg(s) {}
+
+    bool operator() (pstream &in, result_type *result = nullptr) const {
+        bool const b = p(in, result);
+        cout << msg << ": ";
+
+        if (b) {
+            cout << "succ(";
+        } else {
+            cout << "fail(";
+        }
+
+        if (result != nullptr) {
+            cout << *result;
+        }
+
+        cout << ")\n";
+        return b;
+    }
+};
+
+template <typename P> parser_log<P> log(string const& s, P &p) {
+    return parser_log<P>(s, p);
+}
+
 //============================================================================
 // Some derived definitions for convenience: option, some
 
