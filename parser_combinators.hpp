@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <memory>
 #include <cassert>
+#include <iterator>
 #include "function_traits.hpp"
 
 using namespace std;
@@ -166,21 +167,23 @@ struct parse_error : public runtime_error {
 
 class pstream {
     streambuf* in;
+    vector<streampos> stack;
+    
     int count;
     int row;
     int col;
     int sym;
 
 public:
-    pstream(istream &f) : in(f.rdbuf()), count(0), row(1), col(1), sym(in->sbumpc()) {}
+    pstream(istream &f) : in(f.rdbuf()), count(0), row(1), col(1), sym(in->sgetc()) {}
 
     void error(string const& err, string const& exp) {
         throw parse_error(err, row, col, exp, sym);
     }
 
     void next() {
-        sym = in->sgetc();
         in->snextc();
+        sym = in->sgetc();
         ++count;
         if (sym == '\n') {
             ++row;
@@ -204,6 +207,20 @@ public:
 
     int get_sym() {
         return sym;
+    }
+
+    void checkpoint() {
+        stack.push_back(count);
+    }
+
+    void backtrack() {
+        count = stack.back();
+        in->pubseekpos(count);
+        sym = in->sgetc();
+    }
+
+    void commit() {
+        stack.pop_back();
     }
 };
 
@@ -477,7 +494,17 @@ public:
     combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
-        return p1(in, result) || p2(in, result);
+        in.checkpoint();
+        if (p1(in, result)) {
+            in.commit();
+            return true;
+        }
+        in.backtrack();
+        in.commit(); // last-call optimisation.
+        if (p2(in, result)) {
+            return true;
+        }
+        return false;
     }
 };
 
@@ -744,7 +771,7 @@ public:
             cout << *result;
         }
 
-        cout << ")\n";
+        cout << ") @" << in.get_count() << "\n";
         return b;
     }
 };
