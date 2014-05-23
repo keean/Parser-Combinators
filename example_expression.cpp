@@ -10,86 +10,61 @@ using namespace std;
 //----------------------------------------------------------------------------
 // Example Expression Evaluating File Parser.
 
-enum class op {add = 0, sub = 1, mul = 2, div = 3};
-
-ostream& operator<< (ostream &in, op opr) {
-    switch (opr) {
-        case op::add:
-            in << " + ";
-            break;
-        case op::sub:
-            in << " - ";
-            break;
-        case op::mul:
-            in << " * ";
-            break;
-        case op::div:
-            in << " / ";
-            break;
-    }
-    return in;
-}
-
 struct return_int {
     return_int() {}
-    void operator() (int *res, string const& num) const {
+    void operator() (int *res, string &num) const {
         *res = stoi(num);
     }
 } const return_int;
 
-struct return_op {
-    return_op() {}
-    void operator() (
-        enum op *res, int choice, string const& add,
-        string const& sub, string const& mul, string const& div
-    ) const {
-        *res = static_cast<enum op>(choice);
+struct return_add {
+    return_add() {}
+    void operator() (int *res, int left, string&, int right) const {
+        *res = left + right;
     }
-} const return_op;
+} const return_add;
 
-struct return_exp {
-    return_exp() {}
-    void operator() (int *res, int left, enum op opr, int right) const {
-        switch (opr) {
-            case op::add:
-                *res = left + right;
-                break;
-            case op::sub:
-                *res = left - right;
-                break;
-            case op::mul:
-                *res = left * right;
-                break;
-            case op::div:
-                *res = left / right;
-                break;
-        }
+struct return_sub {
+    return_sub() {}
+    void operator() (int *res, int left, string&, int right) const {
+        *res = left - right;
     }
-} const return_exp;
+} const return_sub;
 
-auto const recognise_number = some(accept(is_digit));
+struct return_mul {
+    return_mul() {}
+    void operator() (int *res, int left, string&, int right) const {
+        *res = left * right;
+    }
+} const return_mul;
+
+struct return_div {
+    return_div() {}
+    void operator() (int *res, int left, string&, int right) const {
+        *res = left / right;
+    }
+} const return_div;
+
 auto const recognise_space = many(accept(is_space));
-auto const recognise_start = recognise_space && accept(is_char('('));
-auto const recognise_end = recognise_space && accept(is_char(')'));
+auto const recognise_number = discard(recognise_space) && some(accept(is_digit));
+auto const recognise_start = discard(recognise_space) && accept(is_char('('));
+auto const recognise_end = discard(recognise_space) && accept(is_char(')'));
 
-auto const parse_operand = discard(recognise_space) && all(return_int, recognise_number);
-auto const parse_operator = discard(recognise_space) && any(return_op,
-    accept(is_char('+')), accept(is_char('-')), accept(is_char('*')), accept(is_char('/')));
+parser_handle<int> const additive_expr(parser_handle<int> const e) {
+    return log("+", all(return_add, e, discard(recognise_space) && accept(is_char('+')), e))
+        || log("-", all(return_sub, e, discard(recognise_space) && accept(is_char('-')), e));
+}
 
-// method 1
-parser_reference<int> expression_parser1;
-auto const expression1 = discard(recognise_start) && all(return_exp,
-        log("left", expression_parser1 || parse_operand),
-        log("op", parse_operator),
-        log("right", expression_parser1 || parse_operand)
-    ) && discard(recognise_end);
+parser_handle<int> const multiplicative_expr(parser_handle<int> const e) {
+    return log("*", all(return_mul, e, discard(recognise_space) && accept(is_char('*')), e))
+        || log("/", all(return_div, e, discard(recognise_space) && accept(is_char('/')), e));
+}
 
-// method 2
-parser_handle<int> expression_parser2 = discard(recognise_start) && all(return_exp,
-        log("left", reference(expression_parser2) || parse_operand),
-        log("op", parse_operator),
-        log("right", reference(expression_parser2) || parse_operand)
-    ) && discard(recognise_end);
+parser_handle<int> const expression = (
+        discard(recognise_start) && (
+            additive_expr(reference(expression)) || multiplicative_expr(reference(expression))
+        ) && discard(recognise_end)
+    ) || all(return_int, recognise_number);
 
 class csv_parser {
     pstream in;
@@ -98,11 +73,7 @@ public:
     csv_parser(fstream &fs) : in(fs) {}
 
     int operator() () {
-        expression_parser1 = expression1; // only needed with method 1 we must tie the knot dynamically
-
-        // uncomment 1 as appropriate
-        //auto const parser = expression_parser1;
-        auto const parser = expression_parser2;
+        auto const parser = expression;
 
         decltype(parser)::result_type a {}; 
 
