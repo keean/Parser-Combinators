@@ -746,6 +746,9 @@ template <typename P> parser_ref<P> reference(P &p) {
     return parser_ref<P>(p);
 }
 
+//============================================================================
+// Logging Parser
+
 template <typename Parser> 
 class parser_log {
     Parser const p;
