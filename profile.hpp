@@ -40,7 +40,7 @@ public:
     }
 
     static void reset() {
-        t = 0;
+        t = 1;
     }
 
     static uint64_t report() {
@@ -48,6 +48,6 @@ public:
     }
 };
 
-template<typename T> uint64_t profile<T>::t {0};
+template<typename T> uint64_t profile<T>::t {1};
 template<typename T> uint64_t profile<T>::s;
 
