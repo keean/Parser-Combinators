@@ -271,7 +271,7 @@ template <typename P1, typename P2> struct least_general <P1, P2, typename enabl
 };
 
 //============================================================================
-// Primitive String Recognisers: accept, expect
+// Primitive String Recognisers: accept, accept_str
 
 //----------------------------------------------------------------------------
 // Stream is advanced if symbol matches, and symbol is appended to result.
@@ -303,38 +303,8 @@ recogniser_accept<P> const accept(P const &p) {
     return recogniser_accept<P>(p);
 }
 
-//----------------------------------------------------------------------------
-// Throw exception if symbol does not match, accept otherwise.
-
-template <typename Predicate> class recogniser_expect {
-    Predicate const p;
-
-public:
-    using is_parser_type = true_type;
-    using result_type = string;
-
-    explicit recogniser_expect(Predicate const& p) : p(p) {}
-
-    bool operator() (pstream &in, string *result = nullptr) const {
-        int const sym = in.get_sym();
-        if (!p(sym)) {
-            in.error("expected", p.name);
-        }
-        in.next();
-        if (result != nullptr) {
-            result->push_back(sym);
-        }
-        return true;
-    }
-};
-
-template <typename P, typename = typename P::is_predicate_type>
-recogniser_expect<P> const expect(P const& p) {
-    return recogniser_expect<P>(p);
-}
-
-//============================================================================
-// 
+//-----------------------------------------------------------------------------
+// String Parser.
 
 class accept_str {
     string const s;
@@ -524,13 +494,13 @@ public:
     combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
-        in.checkpoint();
+        int const s = in.size();
         if (p1(in, result)) {
-            in.commit();
             return true;
         }
-        in.backtrack();
-        in.commit(); // last-call optimisation.
+        if (s != in.size()) {
+            in.error("failed parser consumed input", "in || operator");
+        }
         if (p2(in, result)) {
             return true;
         }
@@ -811,6 +781,62 @@ public:
 
 template <typename P> parser_log<P> log(string const& s, P &p) {
     return parser_log<P>(s, p);
+}
+
+//============================================================================
+// Backtracking Parser
+
+template <typename Parser>
+class parser_try {
+    Parser const p;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = typename Parser::result_type;
+
+    explicit parser_try(Parser const& q) : p(q) {}
+
+    bool operator() (pstream &in, result_type *result = nullptr) const {
+        in.checkpoint();
+        if (p(in, result)) {
+            in.commit();
+            return true;
+        }
+        in.backtrack();
+        in.commit();
+        return false;
+    }
+};
+
+template <typename P, typename = typename P::is_parser_type>
+parser_try<P> attempt(P const& p) {
+    return parser_try<P>(p);
+}
+
+//============================================================================
+// Convert fail to error
+
+template <typename Parser>
+class parser_strict {
+    Parser const p;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = typename Parser::result_type;
+
+    explicit parser_strict(Parser const& q) : p(q) {}
+
+    bool operator() (pstream &in, result_type *result = nullptr) const {
+        if (!p(in, result)) {
+            in.error("parser failed", "in strict parser");
+        }
+        return true;
+    }
+};
+
+template <typename P, typename = typename P::is_parser_type>
+parser_strict<P> strict(P const& p) {
+    return parser_strict<P>(p);
 }
 
 //============================================================================
