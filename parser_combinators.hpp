@@ -804,3 +804,10 @@ template <typename P> auto some (P const& p) -> decltype(p && many(p)) {
     return p && many(p);
 }
 
+//----------------------------------------------------------------------------
+// Lazy Tokenisation.
+
+template <typename R> auto tokenise (R const& r) -> decltype(discard(many(accept(is_space))) && r) {
+    return discard(many(accept(is_space))) && r;
+}
+
