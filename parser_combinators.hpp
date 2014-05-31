@@ -290,10 +290,10 @@ public:
         if (!p(sym)) {
             return false;
         }
+        in.next();
         if (result != nullptr) {
             result->push_back(sym);
         }
-        in.next();
         return true;
     }
 };
@@ -320,10 +320,10 @@ public:
         if (!p(sym)) {
             in.error("expected", p.name);
         }
+        in.next();
         if (result != nullptr) {
             result->push_back(sym);
         }
-        in.next();
         return true;
     }
 };
@@ -332,6 +332,32 @@ template <typename P, typename = typename P::is_predicate_type>
 recogniser_expect<P> const expect(P const& p) {
     return recogniser_expect<P>(p);
 }
+
+//============================================================================
+// 
+
+class accept_str {
+    string const s;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = string;
+
+    explicit accept_str(string const& s) : s(s) {}
+
+    bool operator() (pstream &in, string *result = nullptr) const {
+        for (int i = 0; i < s.size(); ++i) {
+            if (s[i] != in.get_sym()) {
+                return false;
+            }
+            in.next();
+        }
+        if (result != nullptr) {
+            result->append(s);
+        }
+        return true;
+    }
+};
 
 //============================================================================
 // Constant Parsers: succ, fail
