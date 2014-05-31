@@ -27,41 +27,14 @@ struct is_any {
     }
 } const is_any;
 
-struct is_space {
+struct is_alnum {
     using is_predicate_type = true_type;
-    string const name = "space";
-    is_space() {}
+    string const name = "alphanumeric";
+    is_alnum() {}
     bool operator() (int const c) const {
-        return ::isspace(c) != 0;
+        return ::isalnum(c) != 0;
     }
-} const is_space;
-
-struct is_digit {
-    using is_predicate_type = true_type;
-    string const name = "digit";
-    is_digit() {}
-    bool operator() (int const c) const {
-        return ::isdigit(c) != 0;
-    }
-} const is_digit;
-
-struct is_upper {
-    using is_predicate_type = true_type;
-    string const name = "uppercase";
-    is_upper() {}
-    bool operator() (int const c) const {
-        return ::isupper(c) != 0;
-    }
-} const is_upper;
-
-struct is_lower {
-    using is_predicate_type = true_type;
-    string const name = "lowercase";
-    is_lower() {}
-    bool operator() (int const c) const {
-        return ::islower(c) != 0;
-    }
-} const is_lower;
+} const is_alnum;
 
 struct is_alpha {
     using is_predicate_type = true_type;
@@ -72,14 +45,50 @@ struct is_alpha {
     }
 } const is_alpha;
 
-struct is_alnum {
+struct is_blank {
     using is_predicate_type = true_type;
-    string const name = "alphanumeric";
-    is_alnum() {}
+    string const name = "blank";
+    is_blank() {}
     bool operator() (int const c) const {
-        return ::isalnum(c) != 0;
+        return ::isblank(c) != 0;
     }
-} const is_alnum;
+} const is_blank;
+
+struct is_cntrl {
+    using is_predicate_type = true_type;
+    string const name = "control";
+    is_cntrl() {}
+    bool operator() (int const c) const {
+        return ::iscntrl(c) != 0;
+    }
+} const is_cntrl;
+
+struct is_digit {
+    using is_predicate_type = true_type;
+    string const name = "digit";
+    is_digit() {}
+    bool operator() (int const c) const {
+        return ::isdigit(c) != 0;
+    }
+} const is_digit;
+
+struct is_graph {
+    using is_predicate_type = true_type;
+    string const name = "graph";
+    is_graph() {}
+    bool operator() (int const c) const {
+        return ::isgraph(c) != 0;
+    }
+} const is_graph;
+
+struct is_lower {
+    using is_predicate_type = true_type;
+    string const name = "lowercase";
+    is_lower() {}
+    bool operator() (int const c) const {
+        return ::islower(c) != 0;
+    }
+} const is_lower;
 
 struct is_print {
     using is_predicate_type = true_type;
@@ -89,6 +98,42 @@ struct is_print {
         return ::isprint(c) != 0;
     }
 } const is_print;
+
+struct is_punct {
+    using is_predicate_type = true_type;
+    string const name = "punctuation";
+    is_punct() {}
+    bool operator() (int const c) const {
+        return ::ispunct(c) != 0;
+    }
+} const is_punct;
+
+struct is_space {
+    using is_predicate_type = true_type;
+    string const name = "space";
+    is_space() {}
+    bool operator() (int const c) const {
+        return ::isspace(c) != 0;
+    }
+} const is_space;
+
+struct is_upper {
+    using is_predicate_type = true_type;
+    string const name = "uppercase";
+    is_upper() {}
+    bool operator() (int const c) const {
+        return ::isupper(c) != 0;
+    }
+} const is_upper;
+
+struct is_xdigit {
+    using is_predicate_type = true_type;
+    string const name = "hexdigit";
+    is_xdigit() {}
+    bool operator() (int const c) const {
+        return ::isxdigit(c) != 0;
+    }
+} const is_xdigit;
 
 //----------------------------------------------------------------------------
 // Any single character
@@ -156,66 +201,110 @@ is_not<P1> const operator~ (P1 const& p1) {
 //===========================================================================
 // File Stream With Location (Row/Col) and Exceptions
 
-struct parse_error : public runtime_error {
-    int const row;
-    int const col;
-    int const sym;
-    string const exp;
-    parse_error(string const& what, int row, int col, string const& exp, int sym)
-        : runtime_error(what), row(row), col(col), sym(sym), exp(exp) {}
+struct location {
+    int begin;
+    int pos;
+    int row;
+    int col;
+    location() : begin(0), pos(0), row(1), col(1) {}
 };
+
+struct parse_error : public runtime_error {
+    streambuf *const in;
+    string const name;
+    location const loc;
+    int const end;
+    parse_error(string const& what, streambuf *in, string const& name, location s, int e)
+        : runtime_error(what), in(in), name(name), loc(s), end(e) {}
+
+    string extract() const {
+        string s;
+        in->pubseekpos(loc.begin);
+        int i = loc.begin;
+        while ((i < end) && (in->sgetc() != EOF)) {
+            s.push_back(in->sbumpc());
+            ++i;
+        }
+        while ((in->sgetc() != EOF) && (in->sgetc() != '\n')) {
+            s.push_back(in->sbumpc());
+            ++i;
+        }
+        s.push_back('\n');
+        i = loc.begin;
+        while ((i < loc.pos) && (in->sgetc() != EOF)) {
+            s.push_back(' ');
+            ++i;
+        }
+        if (i < end) {
+            s.push_back('^');
+        }
+        while ((i < end - 1) && (in->sgetc() != EOF)) {
+            s.push_back('-');
+            ++i;
+        }
+        s.push_back('^');
+        return s;
+    }
+};
+
+ostream& operator<< (ostream& out, parse_error &e) {
+    out <<  e.what() << ":\n"
+        << "line " << e.loc.row << ", column " << e.loc.col << ".\n"
+        << e.extract() << "\n"
+        << e.name << "\n";
+    return out;
+}
 
 class pstream {
     streambuf* in;
-    vector<streampos> stack;
+    vector<location> stack;
     
-    int count;
-    int row;
-    int col;
+    location loc;
     int sym;
 
 public:
-    pstream(istream &f) : in(f.rdbuf()), count(0), row(1), col(1), sym(in->sgetc()) {}
+    pstream(istream &f) : in(f.rdbuf()), sym(in->sgetc()) {}
 
-    void error(string const& err, string const& exp) {
-        throw parse_error(err, row, col, exp, sym);
+    void error(string const& err, string const& name, location l) {
+        throw parse_error(err, in, name, l, loc.pos);
     }
 
     void next() {
         in->snextc();
         sym = in->sgetc();
-        ++count;
+        ++loc.pos;
         if (sym == '\n') {
-            ++row;
-            col = 0;
+            ++loc.row;
+            loc.col = 0;
+            loc.begin = loc.pos;
         } else if (::isprint(sym)) {
-            ++col;
+            ++loc.col;
         }
     }
 
-    int get_count() {
-        return count;
+    location get_location() {
+        return loc;
     }
 
-    int get_col() {
-        return col;
-    }
-    
-    int get_row() {
-        return row;
+    int get_pos() {
+        return loc.pos;
     }
 
     int get_sym() {
         return sym;
     }
 
+    int size() {
+        return stack.size();
+    }
+    
     void checkpoint() {
-        stack.push_back(count);
+        stack.push_back(loc);
     }
 
     void backtrack() {
-        count = stack.back();
-        in->pubseekpos(count);
+        loc = stack.back();
+        in->pubseekpos(loc.pos);
         sym = in->sgetc();
     }
 
@@ -223,9 +312,6 @@ public:
         stack.pop_back();
     }
 
-    int size() {
-        return stack.size();
-    }
 };
 
 //============================================================================
@@ -270,6 +356,19 @@ template <typename P1, typename P2> struct least_general <P1, P2, typename enabl
     using result_type = typename P1::result_type;
 };
 
+//----------------------------------------------------------------------------
+// Concatenate multiple string template arguments into a single string.
+
+string concat(string const& str) {
+    return str;
+}
+
+template <typename... Strs> string concat(string const& str, Strs const&... strs) {
+    string s = str;
+    int const unpack[] {0, (s += ", " + strs, 0)...};
+    return s;
+}
+
 //============================================================================
 // Primitive String Recognisers: accept, accept_str
 
@@ -283,7 +382,9 @@ public:
     using is_parser_type = true_type;
     using result_type = string;
 
-    explicit recogniser_accept(Predicate const& p) : p(p) {}
+    string const name;
+
+    explicit recogniser_accept(Predicate const& p) : p(p), name(p.name) {}
 
     bool operator() (pstream &in, string *result = nullptr) const {
         int const sym = in.get_sym();
@@ -313,7 +414,9 @@ public:
     using is_parser_type = true_type;
     using result_type = string;
 
-    explicit accept_str(string const& s) : s(s) {}
+    string const name;
+
+    explicit accept_str(string const& s) : s(s), name("\"" + s + "\"") {}
 
     bool operator() (pstream &in, string *result = nullptr) const {
         for (int i = 0; i < s.size(); ++i) {
@@ -339,6 +442,8 @@ struct parser_succ {
     using is_parser_type = true_type;
     using result_type = void;
 
+    string const name = "succ";
+
     parser_succ() {}
 
     bool operator() (pstream &in, void *result = nullptr) const {
@@ -352,6 +457,8 @@ struct parser_succ {
 struct parser_fail {
     using is_parser_type = true_type;
     using result_type = void;
+
+    string const name = "fail";
 
     parser_fail() {}
 
@@ -409,7 +516,10 @@ private:
     }
 
 public:
-    explicit fmap_choice(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
+    string const name;
+
+    explicit fmap_choice(Functor const& f, Parsers const&... ps)
+        : f(f), ps(ps...), name("any(?, " + concat((ps.name)...) + ")") {}
 
     template <typename Is = typename range<0, sizeof...(Parsers)>::type>
     bool operator() (pstream &in, result_type *result = nullptr) const {
@@ -464,7 +574,10 @@ private:
     }
 
 public:
-    explicit fmap_sequence(Functor const& f, Parsers const&... ps) : f(f), ps(ps...) {}
+    string const name;
+
+    explicit fmap_sequence(Functor const& f, Parsers const&... ps)
+        : f(f), ps(ps...), name("all(?, " + concat((ps.name)...) + ")") {}
 
     template <typename Is = typename range<0, sizeof...(Parsers)>::type>
     bool operator() (pstream &in, result_type *result = nullptr) const {
@@ -491,15 +604,19 @@ public:
     using is_parser_type = true_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
 
-    combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
+    string const name;
+
+    combinator_choice(Parser1 const& p1, Parser2 const& p2) 
+        : p1(p1), p2(p2), name(p1.name + " || " + p2.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
-        int const s = in.size();
+        location const start = in.get_location();
         if (p1(in, result)) {
             return true;
         }
-        if (s != in.size()) {
-            in.error("failed parser consumed input", "in || operator");
+        int const end = in.get_pos();
+        if (start.pos != end) {
+            in.error("failed parser consumed input", p1.name, start);
         }
         if (p2(in, result)) {
             return true;
@@ -527,7 +644,10 @@ public:
     using is_parser_type = true_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
 
-    combinator_sequence(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
+    string const name;
+
+    combinator_sequence(Parser1 const& p1, Parser2 const& p2)
+        : p1(p1), p2(p2), name(p1.name + " && " + p2.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         return p1(in, result) && p2(in, result);
@@ -552,7 +672,9 @@ public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
 
-    explicit combinator_many(Parser const& p) : p(p) {}
+    string const name;
+
+    explicit combinator_many(Parser const& p) : p(p), name("many(" + p.name + ")") {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         while (p(in, result));
@@ -575,7 +697,9 @@ public:
     using is_parser_type = true_type;
     using result_type = void;
 
-    explicit combinator_discard(Parser const& p) : p(p) {}
+    string const name;
+
+    explicit combinator_discard(Parser const& p) : p(p), name("discard(" + p.name + ")") {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         typename Parser::result_type *const discard_result = nullptr;
@@ -621,6 +745,8 @@ class parser_handle {
 public:
     using is_parser_type = true_type;
     using result_type = Result_Type;
+
+    string const name = "<handle>";
 
     parser_handle() {}
 
@@ -682,7 +808,9 @@ public:
     using is_parser_type = true_type;
     using result_type = Result_Type;
 
-    parser_reference() : p(new parser_handle<Result_Type>()) {}
+    string const name;
+
+    parser_reference() : p(new parser_handle<Result_Type>()), name(p.name) {}
 
     template <typename P, typename = typename P::is_parser_type>
     parser_reference(P const &q) : p(new parser_handle<Result_Type>(q)) {}
@@ -735,14 +863,17 @@ public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
 
-    explicit parser_ref(Parser &q) : p(q) {}
+    string const& name; // note: name is also a reference.
+
+    explicit parser_ref(Parser const &q) : p(q), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         return p(in, result);
     }
 };
 
-template <typename P> parser_ref<P> reference(P &p) {
+template <typename P, typename = typename P::is_parser_type>
+parser_ref<P> reference(P &p) {
     return parser_ref<P>(p);
 }
 
@@ -758,7 +889,10 @@ public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
 
-    explicit parser_log(string const& s, Parser const& q) : p(q), msg(s) {}
+    string const name;
+
+    explicit parser_log(string const& s, Parser const& q)
+        : p(q), msg(s), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         bool const b = p(in, result);
@@ -774,12 +908,13 @@ public:
             cout << *result;
         }
 
-        cout << ") @" << in.get_count() << "(" << in.size() << ")\n";
+        cout << ") @" << in.get_pos() << "(" << in.size() << ")\n";
         return b;
     }
 };
 
-template <typename P> parser_log<P> log(string const& s, P &p) {
+template <typename P, typename = typename P::is_parser_type>
+parser_log<P> log(string const& s, P const& p) {
     return parser_log<P>(s, p);
 }
 
@@ -794,7 +929,10 @@ public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
 
-    explicit parser_try(Parser const& q) : p(q) {}
+    string const name;
+
+    explicit parser_try(Parser const& q)
+        : p(q), name("attempt(" + q.name + ")") {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         in.checkpoint();
@@ -824,11 +962,15 @@ public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
 
-    explicit parser_strict(Parser const& q) : p(q) {}
+    string const name;
+
+    explicit parser_strict(Parser const& q)
+        : p(q), name("strict(" + q.name + ")") {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
+        location const start = in.get_location();
         if (!p(in, result)) {
-            in.error("parser failed", "in strict parser");
+            in.error("strict parser failed", p.name, start);
         }
         return true;
     }
