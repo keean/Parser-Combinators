@@ -365,7 +365,7 @@ string concat(string const& str) {
 
 template <typename... Strs> string concat(string const& str, Strs const&... strs) {
     string s = str;
-    int const unpack[] {0, (s += ", " + strs, 0)...};
+    int const unpack[] {0, (s += " " + strs, 0)...};
     return s;
 }
 
@@ -519,7 +519,7 @@ public:
     string const name;
 
     explicit fmap_choice(Functor const& f, Parsers const&... ps)
-        : f(f), ps(ps...), name("any(?, " + concat((ps.name)...) + ")") {}
+        : f(f), ps(ps...), name("any(" + concat((ps.name)...) + ")") {}
 
     template <typename Is = typename range<0, sizeof...(Parsers)>::type>
     bool operator() (pstream &in, result_type *result = nullptr) const {
@@ -577,7 +577,7 @@ public:
     string const name;
 
     explicit fmap_sequence(Functor const& f, Parsers const&... ps)
-        : f(f), ps(ps...), name("all(?, " + concat((ps.name)...) + ")") {}
+        : f(f), ps(ps...), name(concat((ps.name)...)) {}
 
     template <typename Is = typename range<0, sizeof...(Parsers)>::type>
     bool operator() (pstream &in, result_type *result = nullptr) const {
@@ -607,7 +607,7 @@ public:
     string const name;
 
     combinator_choice(Parser1 const& p1, Parser2 const& p2) 
-        : p1(p1), p2(p2), name(p1.name + " || " + p2.name) {}
+        : p1(p1), p2(p2), name("(" + p1.name + " || " + p2.name + ")") {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         location const start = in.get_location();
@@ -647,7 +647,7 @@ public:
     string const name;
 
     combinator_sequence(Parser1 const& p1, Parser2 const& p2)
-        : p1(p1), p2(p2), name(p1.name + " && " + p2.name) {}
+        : p1(p1), p2(p2), name(p1.name + " " + p2.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         return p1(in, result) && p2(in, result);
@@ -699,7 +699,7 @@ public:
 
     string const name;
 
-    explicit combinator_discard(Parser const& p) : p(p), name("discard(" + p.name + ")") {}
+    explicit combinator_discard(Parser const& q) : p(q), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         typename Parser::result_type *const discard_result = nullptr;
@@ -932,7 +932,7 @@ public:
     string const name;
 
     explicit parser_try(Parser const& q)
-        : p(q), name("attempt(" + q.name + ")") {}
+        : p(q), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         in.checkpoint();
@@ -957,6 +957,7 @@ parser_try<P> attempt(P const& p) {
 template <typename Parser>
 class parser_strict {
     Parser const p;
+    string const err;
 
 public:
     using is_parser_type = true_type;
@@ -964,21 +965,47 @@ public:
 
     string const name;
 
-    explicit parser_strict(Parser const& q)
-        : p(q), name("strict(" + q.name + ")") {}
+    parser_strict(string const& s, Parser const& q)
+        : p(q), err(s), name("strict(" + q.name + ")") {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         location const start = in.get_location();
         if (!p(in, result)) {
-            in.error("strict parser failed", p.name, start);
+            in.error(err, p.name, start);
         }
         return true;
     }
 };
 
 template <typename P, typename = typename P::is_parser_type>
-parser_strict<P> strict(P const& p) {
-    return parser_strict<P>(p);
+parser_strict<P> strict(string const& s, P const& p) {
+    return parser_strict<P>(s, p);
+}
+
+//============================================================================
+// Name a parser (for better error readability)
+
+template <typename Parser>
+class parser_name {
+    Parser const p;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = typename Parser::result_type;
+
+    string const name;
+
+    parser_name(string const& s, Parser const& q)
+        : p(q), name(s) {}
+
+    bool operator() (pstream &in, result_type *result = nullptr) const {
+        return p(in, result);
+    }
+};
+
+template <typename P, typename = typename P::is_parser_type>
+parser_name<P> name(string const& s, P const& p) {
+    return parser_name<P>(s, p);
 }
 
 //============================================================================
