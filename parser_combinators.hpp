@@ -222,6 +222,10 @@ public:
     void commit() {
         stack.pop_back();
     }
+
+    int size() {
+        return stack.size();
+    }
 };
 
 //============================================================================
@@ -774,7 +778,7 @@ public:
             cout << *result;
         }
 
-        cout << ") @" << in.get_count() << "\n";
+        cout << ") @" << in.get_count() << "(" << in.size() << ")\n";
         return b;
     }
 };
