@@ -45,26 +45,29 @@ struct return_div {
     }
 } const return_div;
 
-auto const recognise_space = many(accept(is_space));
-auto const recognise_number = discard(recognise_space) && some(accept(is_digit));
-auto const recognise_start = discard(recognise_space) && accept(is_char('('));
-auto const recognise_end = discard(recognise_space) && accept(is_char(')'));
+auto const number_tok = tokenise(some(accept(is_digit)));
+auto const start_tok = tokenise(accept(is_char('(')));
+auto const end_tok = tokenise(accept(is_char(')')));
+auto const add_tok = tokenise( accept(is_char('+')));
+auto const sub_tok = tokenise( accept(is_char('-')));
+auto const mul_tok = tokenise( accept(is_char('*')));
+auto const div_tok = tokenise( accept(is_char('/')));
 
 parser_handle<int> const additive_expr(parser_handle<int> const e) {
-    return log("+", all(return_add, e, discard(recognise_space) && accept(is_char('+')), e))
-        || log("-", all(return_sub, e, discard(recognise_space) && accept(is_char('-')), e));
+    return log("+", all(return_add, e, add_tok, e))
+        || log("-", all(return_sub, e, sub_tok, e));
 }
 
 parser_handle<int> const multiplicative_expr(parser_handle<int> const e) {
-    return log("*", all(return_mul, e, discard(recognise_space) && accept(is_char('*')), e))
-        || log("/", all(return_div, e, discard(recognise_space) && accept(is_char('/')), e));
+    return log("*", all(return_mul, e, mul_tok, e))
+        || log("/", all(return_div, e, div_tok, e));
 }
 
 parser_handle<int> const expression = (
-        discard(recognise_start) && (
-            additive_expr(reference(expression)) || multiplicative_expr(reference(expression))
-        ) && discard(recognise_end)
-    ) || all(return_int, recognise_number);
+        discard(start_tok)
+        && (additive_expr(reference(expression)) || multiplicative_expr(reference(expression)))
+        && discard(end_tok))
+    || all(return_int, number_tok);
 
 class csv_parser {
     pstream in;
