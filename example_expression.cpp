@@ -47,13 +47,13 @@ struct return_div {
     }
 } const return_div;
 
-auto const number_tok = tokenise(some(accept(is_digit)));
-auto const start_tok = tokenise(accept(is_char('(')));
-auto const end_tok = tokenise(accept(is_char(')')));
-auto const add_tok = tokenise(accept(is_char('+')));
-auto const sub_tok = tokenise(accept(is_char('-')));
-auto const mul_tok = tokenise(accept(is_char('*')));
-auto const div_tok = tokenise(accept(is_char('/')));
+auto const number_tok = name("number", tokenise(some(accept(is_digit))));
+auto const start_tok = name("'('", tokenise(accept(is_char('('))));
+auto const end_tok = name("')'", tokenise(accept(is_char(')'))));
+auto const add_tok = name("'+'", tokenise(accept(is_char('+'))));
+auto const sub_tok = name("'-'", tokenise(accept(is_char('-'))));
+auto const mul_tok = name("'*'", tokenise(accept(is_char('*'))));
+auto const div_tok = name("'/'", tokenise(accept(is_char('/'))));
 
 parser_handle<int> const additive_expr(parser_handle<int> const e) {
     return log("+", attempt(all(return_add, e, add_tok, e)))
@@ -65,9 +65,10 @@ parser_handle<int> const multiplicative_expr(parser_handle<int> const e) {
         || log("/", attempt(all(return_div, e, div_tok, e)));
 }
 
-parser_handle<int> const expression = strict(attempt(
+parser_handle<int> const expression = strict("invalid expression", attempt(
         discard(start_tok)
-        && (attempt(additive_expr(reference(expression))) || multiplicative_expr(reference(expression)))
+        && (attempt(name("additive-expression", additive_expr(reference(expression))))
+            || name("multiplicative-expression", multiplicative_expr(reference(expression))))
         && discard(end_tok))
     || all(return_int, number_tok));
 
