@@ -248,8 +248,7 @@ struct parse_error : public runtime_error {
 };
 
 ostream& operator<< (ostream& out, parse_error &e) {
-    out <<  e.what() << ":\n"
-        << "line " << e.loc.row << ", column " << e.loc.col << ".\n"
+    out <<  e.what() << ": " << "line " << e.loc.row << ", column " << e.loc.col << ".\n"
         << e.extract() << "\n"
         << e.name << "\n";
     return out;
