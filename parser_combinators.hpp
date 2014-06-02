@@ -690,7 +690,14 @@ public:
     explicit combinator_many(Parser const& p) : p(p), name("{" + p.name + "}") {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
-        while (p(in, result));
+        location start = in.get_location();
+        while (p(in, result)) {
+            start = in.get_location();
+        }
+        int const end = in.get_pos();
+        if (start.pos != end) {
+            in.error("failed parser consumed input", p.name, start);
+        }
         return true;
     }
 };
@@ -713,8 +720,8 @@ public:
     int const rank = 0;
     string const name;
 
-    combinator_except(Parser const& p, typename Parser::result_type const x) : p(p), x(x)
-        , name(p.name + " - \"" + x + "\"") {}
+    combinator_except(typename Parser::result_type const& x, Parser const& p)
+        : p(p), x(x), name(p.name + " - \"" + x + "\"") {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         if (p(in, result)) {
@@ -728,8 +735,8 @@ public:
 };
 
 template <typename P, typename = typename P::is_parser_type>
-combinator_except<P> const except(P const& p, typename P::result_type x) {
-    return combinator_except<P>(p, x);
+combinator_except<P> const except(typename P::result_type const& x, P const& p) {
+    return combinator_except<P>(x, p);
 }
 
 //============================================================================
