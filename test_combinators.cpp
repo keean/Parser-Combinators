@@ -26,9 +26,9 @@ struct parse_line {
     }
 } const parse_line;
 
-auto const number_tok = name("number", tokenise(some(accept(is_digit))));
-auto const separator_tok = name("','", tokenise(accept(is_char(','))));
-auto const parse_csv = some(all(parse_line, some(all(parse_int, number_tok) && discard(separator_tok))));
+auto const number_tok = tokenise(some(accept(is_digit)));
+auto const separator_tok = tokenise(accept(is_char(',')));
+auto const parse_csv = strict("error parsing csv", some(all(parse_line, some(all(parse_int, number_tok) && discard(separator_tok)))));
 
 class csv_parser {
     pstream in;
