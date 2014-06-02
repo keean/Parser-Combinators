@@ -700,6 +700,38 @@ combinator_many<P> const many(P const& p) {
     return combinator_many<P>(p);
 }
 
+//----------------------------------------------------------------------------
+// Exception parser
+
+template <typename Parser> class combinator_except {
+    Parser const p;
+    typename Parser::result_type const x;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = typename Parser::result_type;
+    int const rank = 0;
+    string const name;
+
+    combinator_except(Parser const& p, typename Parser::result_type const x) : p(p), x(x)
+        , name(p.name + " - \"" + x + "\"") {}
+
+    bool operator() (pstream &in, result_type *result = nullptr) const {
+        if (p(in, result)) {
+            if (result != nullptr) {
+                return x != *result;
+            }
+            return true;
+        }
+        return false;
+    }
+};
+
+template <typename P, typename = typename P::is_parser_type>
+combinator_except<P> const except(P const& p, typename P::result_type x) {
+    return combinator_except<P>(p, x);
+}
+
 //============================================================================
 // Run-time polymorphism
 
