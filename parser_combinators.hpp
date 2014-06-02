@@ -359,14 +359,26 @@ template <typename P1, typename P2> struct least_general <P1, P2, typename enabl
 //----------------------------------------------------------------------------
 // Concatenate multiple string template arguments into a single string.
 
-string concat(string const& str) {
+string concat(string const& sep, string const& str) {
     return str;
 }
 
-template <typename... Strs> string concat(string const& str, Strs const&... strs) {
+template <typename... Strs> string concat(string const& sep, string const& str, Strs const&... strs) {
     string s = str;
-    int const unpack[] {0, (s += " " + strs, 0)...};
+    int const unpack[] {0, (s += sep + strs, 0)...};
     return s;
+}
+
+//----------------------------------------------------------------------------
+// Use EBNF precedence for parser naming.
+
+template <typename P,  typename = typename P::is_parser_type>
+string format_name(P const& p, int const rank) {
+    if (p.rank > rank) {
+        return "(" + p.name + ")";
+    } else {
+        return p.name;
+    }
 }
 
 //============================================================================
@@ -381,7 +393,7 @@ template <typename Predicate> class recogniser_accept {
 public:
     using is_parser_type = true_type;
     using result_type = string;
-
+    int const rank = 0;
     string const name;
 
     explicit recogniser_accept(Predicate const& p) : p(p), name(p.name) {}
@@ -413,7 +425,7 @@ class accept_str {
 public:
     using is_parser_type = true_type;
     using result_type = string;
-
+    int const rank = 0;
     string const name;
 
     explicit accept_str(string const& s) : s(s), name("\"" + s + "\"") {}
@@ -441,7 +453,7 @@ public:
 struct parser_succ {
     using is_parser_type = true_type;
     using result_type = void;
-
+    int const rank = 0;
     string const name = "succ";
 
     parser_succ() {}
@@ -457,7 +469,7 @@ struct parser_succ {
 struct parser_fail {
     using is_parser_type = true_type;
     using result_type = void;
-
+    int const rank = 0;
     string const name = "fail";
 
     parser_fail() {}
@@ -516,10 +528,11 @@ private:
     }
 
 public:
+    int const rank = 0;
     string const name;
 
     explicit fmap_choice(Functor const& f, Parsers const&... ps)
-        : f(f), ps(ps...), name("any(" + concat((ps.name)...) + ")") {}
+        : f(f), ps(ps...), name("any(" + concat(" | ", format_name(ps, rank)...) + ")") {}
 
     template <typename Is = typename range<0, sizeof...(Parsers)>::type>
     bool operator() (pstream &in, result_type *result = nullptr) const {
@@ -574,10 +587,11 @@ private:
     }
 
 public:
+    int const rank = 0;
     string const name;
 
     explicit fmap_sequence(Functor const& f, Parsers const&... ps)
-        : f(f), ps(ps...), name(concat((ps.name)...)) {}
+        : f(f), ps(ps...), name(concat(", ", format_name(ps, rank)...)) {}
 
     template <typename Is = typename range<0, sizeof...(Parsers)>::type>
     bool operator() (pstream &in, result_type *result = nullptr) const {
@@ -591,7 +605,7 @@ fmap_sequence<F, PS...> const all(F const& f, PS const&... ps) {
 }
 
 //============================================================================
-// Combinators For Both Parsers and Recognisers: ||, &&, many, discard 
+// Combinators For Both Parsers and Recognisers: ||, &&, many 
 
 //----------------------------------------------------------------------------
 // Run the second parser only if the first fails.
@@ -603,11 +617,11 @@ template <typename Parser1, typename Parser2> class combinator_choice {
 public:
     using is_parser_type = true_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
-
+    int const rank = 1;
     string const name;
 
-    combinator_choice(Parser1 const& p1, Parser2 const& p2) 
-        : p1(p1), p2(p2), name("(" + p1.name + " || " + p2.name + ")") {}
+    combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2)
+        , name(format_name(p1, rank) + " | " + format_name(p2, rank)) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         location const start = in.get_location();
@@ -643,11 +657,11 @@ template <typename Parser1, typename Parser2> class combinator_sequence {
 public:
     using is_parser_type = true_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
-
+    int const rank = 0;
     string const name;
 
-    combinator_sequence(Parser1 const& p1, Parser2 const& p2)
-        : p1(p1), p2(p2), name(p1.name + " " + p2.name) {}
+    combinator_sequence(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2)
+        , name(format_name(p1, rank) +  ", " + format_name(p2, rank)) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         return p1(in, result) && p2(in, result);
@@ -671,10 +685,10 @@ template <typename Parser> class combinator_many {
 public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
-
+    int const rank = 0;
     string const name;
 
-    explicit combinator_many(Parser const& p) : p(p), name("many(" + p.name + ")") {}
+    explicit combinator_many(Parser const& p) : p(p), name("{" + p.name + "}") {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         while (p(in, result));
@@ -685,31 +699,6 @@ public:
 template <typename P, typename = typename P::is_parser_type>
 combinator_many<P> const many(P const& p) {
     return combinator_many<P>(p);
-}
-
-//----------------------------------------------------------------------------
-// Discard the result of the parser (and the result type), keep succeed or fail.
-
-template <typename Parser> class combinator_discard {
-    Parser const p;
-
-public:
-    using is_parser_type = true_type;
-    using result_type = void;
-
-    string const name;
-
-    explicit combinator_discard(Parser const& q) : p(q), name(q.name) {}
-
-    bool operator() (pstream &in, result_type *result = nullptr) const {
-        typename Parser::result_type *const discard_result = nullptr;
-        return p(in, discard_result);
-    }
-};
-
-template <typename P, typename = typename P::is_parser_type>
-combinator_discard<P> const discard(P const& p) {
-    return combinator_discard<P>(p);
 }
 
 //============================================================================
@@ -745,40 +734,44 @@ class parser_handle {
 public:
     using is_parser_type = true_type;
     using result_type = Result_Type;
+    int const rank = 0;
+    string name;
 
-    string const name = "<handle>";
-
-    parser_handle() {}
-
-    template <typename P, typename = typename P::is_parser_type>
-    parser_handle(P const &q) : p(new holder_poly<P>(q)) {} 
-
-    explicit parser_handle(parser_handle const &q) : p(q.p) {}
+    parser_handle() : name("<handle>") {}
 
     template <typename P, typename = typename P::is_parser_type>
-    parser_handle(P &&q) : p(new holder_poly<P>(forward<P>(q))) {}
+    parser_handle(P const &q) : p(new holder_poly<P>(q)), name(q.name) {} 
+
+    explicit parser_handle(parser_handle const &q) : p(q.p), name(q.name) {}
+
+    template <typename P, typename = typename P::is_parser_type>
+    parser_handle(P &&q) : p(new holder_poly<P>(forward<P>(q))), name(q.name) {}
 
     explicit parser_handle(parser_handle &&q) : p(move(q.p)) {}
 
     template <typename P, typename = typename P::is_parser_type>
     parser_handle& operator= (P const &q) {
         p = shared_ptr<holder_base const>(new holder_poly<P>(q));
+        name = q.name;
         return *this;
     }
 
     parser_handle& operator= (parser_handle const &q) {
         p = q.p;
+        name = q.name;
         return *this;
     }
 
     template <typename P, typename = typename P::is_parser_type>
     parser_handle& operator= (P &&q) {
         p = shared_ptr<holder_base const>(new holder_poly<P>(forward<P>(q)));
+        name = q.name;
         return *this;
     }
 
     parser_handle& operator= (parser_handle &&q) {
         p = move(q.p);
+        name = q.name;
         return *this;
     }
 
@@ -807,7 +800,7 @@ class parser_reference {
 public:
     using is_parser_type = true_type;
     using result_type = Result_Type;
-
+    int const rank = 0;
     string const name;
 
     parser_reference() : p(new parser_handle<Result_Type>()), name(p.name) {}
@@ -862,10 +855,10 @@ class parser_ref {
 public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
+    int const &rank;
+    string const &name; // note: name is also a reference.
 
-    string const& name; // note: name is also a reference.
-
-    explicit parser_ref(Parser const &q) : p(q), name(q.name) {}
+    explicit parser_ref(Parser const &q) : p(q), rank(q.rank), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         return p(in, result);
@@ -878,6 +871,35 @@ parser_ref<P> reference(P &p) {
 }
 
 //============================================================================
+// Parser modifiers: are not visible in parser naming.
+
+//----------------------------------------------------------------------------
+// Discard the result of the parser (and the result type), keep succeed or fail.
+
+template <typename Parser> class combinator_discard {
+    Parser const p;
+
+public:
+    using is_parser_type = true_type;
+    using result_type = void;
+    int const rank;
+    string const name;
+
+    explicit combinator_discard(Parser const& q)
+        : p(q), rank(q.rank), name(q.name) {}
+
+    bool operator() (pstream &in, result_type *result = nullptr) const {
+        typename Parser::result_type *const discard_result = nullptr;
+        return p(in, discard_result);
+    }
+};
+
+template <typename P, typename = typename P::is_parser_type>
+combinator_discard<P> const discard(P const& p) {
+    return combinator_discard<P>(p);
+}
+
+//----------------------------------------------------------------------------
 // Logging Parser
 
 template <typename Parser> 
@@ -888,11 +910,11 @@ class parser_log {
 public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
-
+    int const rank;
     string const name;
 
     explicit parser_log(string const& s, Parser const& q)
-        : p(q), msg(s), name(q.name) {}
+        : p(q), msg(s), rank(q.rank), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         bool const b = p(in, result);
@@ -918,7 +940,7 @@ parser_log<P> log(string const& s, P const& p) {
     return parser_log<P>(s, p);
 }
 
-//============================================================================
+//----------------------------------------------------------------------------
 // Backtracking Parser
 
 template <typename Parser>
@@ -928,11 +950,11 @@ class parser_try {
 public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
-
+    int const rank;
     string const name;
 
     explicit parser_try(Parser const& q)
-        : p(q), name(q.name) {}
+        : p(q), rank(q.rank), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         in.checkpoint();
@@ -951,7 +973,7 @@ parser_try<P> attempt(P const& p) {
     return parser_try<P>(p);
 }
 
-//============================================================================
+//----------------------------------------------------------------------------
 // Convert fail to error
 
 template <typename Parser>
@@ -962,11 +984,11 @@ class parser_strict {
 public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
-
+    int const rank;
     string const name;
 
     parser_strict(string const& s, Parser const& q)
-        : p(q), err(s), name("strict(" + q.name + ")") {}
+        : p(q), err(s), rank(q.rank), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         location const start = in.get_location();
@@ -982,7 +1004,7 @@ parser_strict<P> strict(string const& s, P const& p) {
     return parser_strict<P>(s, p);
 }
 
-//============================================================================
+//----------------------------------------------------------------------------
 // Name a parser (for better error readability)
 
 template <typename Parser>
@@ -992,11 +1014,11 @@ class parser_name {
 public:
     using is_parser_type = true_type;
     using result_type = typename Parser::result_type;
-
+    int const rank;
     string const name;
 
     parser_name(string const& s, Parser const& q)
-        : p(q), name(s) {}
+        : p(q), rank(q.rank), name(s) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         return p(in, result);
@@ -1014,21 +1036,24 @@ parser_name<P> name(string const& s, P const& p) {
 //----------------------------------------------------------------------------
 // Optionally accept the parser once.
 
-template <typename P> auto option(P const& p) -> decltype(p || succ) {
-    return p || succ;
+template <typename P> auto option(P const& p)
+-> decltype(name("[" + p.name + "]", p || succ)) {
+    return name("[" + p.name + "]", p || succ);
 }
 
 //----------------------------------------------------------------------------
 // Accept the parser one or more times.
 
-template <typename P> auto some (P const& p) -> decltype(p && many(p)) {
-    return p && many(p);
+template <typename P> auto some (P const& p)
+-> decltype(name("{" + p.name + "}-", p && many(p))) {
+    return name("{" + p.name + "}-", p && many(p));
 }
 
 //----------------------------------------------------------------------------
 // Lazy Tokenisation.
 
-template <typename R> auto tokenise (R const& r) -> decltype(discard(many(accept(is_space))) && r) {
-    return discard(many(accept(is_space))) && r;
+template <typename R> auto tokenise (R const& r)
+-> decltype(name(r.name, discard(many(accept(is_space))) && r)) {
+    return name(r.name, discard(many(accept(is_space))) && r);
 }
 
