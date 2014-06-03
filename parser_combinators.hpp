@@ -957,19 +957,15 @@ public:
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
         bool const b = p(in, result);
-        cout << msg << ": ";
 
         if (b) {
-            cout << "succ(";
-        } else {
-            cout << "fail(";
+            cout << msg << ": succ(";
+            if (result != nullptr) {
+                cout << *result;
+            }
+            cout << ") @" << in.get_pos() << "(" << in.size() << ")\n";
         }
 
-        if (result != nullptr) {
-            cout << *result;
-        }
-
-        cout << ") @" << in.get_pos() << "(" << in.size() << ")\n";
         return b;
     }
 };
