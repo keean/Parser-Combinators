@@ -230,7 +230,7 @@ struct parse_error : public runtime_error {
             ++i;
         }
         s.push_back('\n');
-        i = loc.begin;
+        i = loc.begin + 1;
         while ((i < loc.pos) && (in->sgetc() != EOF)) {
             s.push_back(' ');
             ++i;
@@ -245,14 +245,19 @@ struct parse_error : public runtime_error {
         s.push_back('^');
         return s;
     }
-};
 
-ostream& operator<< (ostream& out, parse_error &e) {
-    out <<  e.what() << ": " << "line " << e.loc.row << ", column " << e.loc.col << ".\n"
-        << e.extract() << "\n"
-        << e.name << "\n";
-    return out;
-}
+    virtual const char* what() const noexcept override {
+        stringstream err;
+
+        err <<  runtime_error::what() << ": "
+            << "line " << loc.row
+            << ", column " << loc.col << ".\n"
+            << extract() << "\n"
+            << name << "\n";
+
+        return err.str().c_str();
+    }
+};
 
 class pstream {
     streambuf* in;
@@ -516,10 +521,15 @@ private:
     template <size_t... I> 
     bool fmap_any(pstream &in, size_sequence<I...> seq, result_type *result) const {
         tmp_type tmp {};
+        location const start = in.get_location();
         int const i = any_parsers<tmp_type, I...>(in, tmp, I...);
         if (i >= 0) {
             if (result != nullptr) {
-                f(result, i, get<I>(tmp)...);
+                try {
+                    f(result, i, get<I>(tmp)...);
+                } catch (runtime_error &e) {
+                    in.error(e.what(), name, start);
+                }
             }
             return true;
         }
@@ -576,9 +586,14 @@ private:
     template <size_t... I> 
     bool fmap_all(pstream &in, size_sequence<I...> seq, result_type *result) const {
         tmp_type tmp {};
+        location const start = in.get_location();
         if (all_parsers<tmp_type, I...>(in, tmp, I...)) {
             if (result != nullptr) {
-                f(result, get<I>(tmp)...);
+                try {
+                    f(result, get<I>(tmp)...);
+                } catch (runtime_error &e) {
+                    in.error(e.what(), name, start);
+                }
             }
             return true;
         }
