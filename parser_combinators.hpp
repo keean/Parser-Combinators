@@ -209,19 +209,17 @@ struct location {
     location() : begin(0), pos(0), row(1), col(1) {}
 };
 
-struct parse_error : public runtime_error {
-    streambuf *const in;
-    string const name;
-    location const loc;
-    int const end;
-    parse_error(string const& what, streambuf *in, string const& name, location s, int e)
-        : runtime_error(what), in(in), name(name), loc(s), end(e) {}
+class parse_error : public runtime_error {
 
-    string extract() const {
+    static string const make_what(
+        string const& w, streambuf *in, string const& n, location const& l, int e
+    ) {
+        stringstream err;
         string s;
-        in->pubseekpos(loc.begin);
-        int i = loc.begin;
-        while ((i < end) && (in->sgetc() != EOF)) {
+
+        in->pubseekpos(l.begin);
+        int i = l.begin;
+        while ((i < e) && (in->sgetc() != EOF)) {
             s.push_back(in->sbumpc());
             ++i;
         }
@@ -230,33 +228,37 @@ struct parse_error : public runtime_error {
             ++i;
         }
         s.push_back('\n');
-        i = loc.begin + 1;
-        while ((i < loc.pos) && (in->sgetc() != EOF)) {
+        i = l.begin;
+        while ((i < l.pos) && (in->sgetc() != EOF)) {
             s.push_back(' ');
             ++i;
         }
-        if (i < end) {
+        if (i++ < e) {
             s.push_back('^');
         }
-        while ((i < end - 1) && (in->sgetc() != EOF)) {
+        while ((i < e) && (in->sgetc() != EOF)) {
             s.push_back('-');
             ++i;
         }
         s.push_back('^');
-        return s;
+
+        err <<  w << ": "
+            << "line " << l.row
+            << ", column " << l.col << ".\n"
+            << s << "\n"
+            << n << "\n";
+
+        return err.str();
     }
 
-    virtual const char* what() const noexcept override {
-        stringstream err;
+public:
+    streambuf *const in;
+    string const name;
+    location const loc;
+    int const end;
 
-        err <<  runtime_error::what() << ": "
-            << "line " << loc.row
-            << ", column " << loc.col << ".\n"
-            << extract() << "\n"
-            << name << "\n";
-
-        return err.str().c_str();
-    }
+    parse_error(string const& what, streambuf *in, string const& name, location const& s, int e)
+        : runtime_error(make_what(what, in, name, s, e)), in(in), name(name), loc(s), end(e) {}
 };
 
 class pstream {
@@ -269,7 +271,7 @@ class pstream {
 public:
     pstream(istream &f) : in(f.rdbuf()), sym(in->sgetc()) {}
 
-    void error(string const& err, string const& name, location l) {
+    void error(string const& err, string const& name, location const& l) {
         throw parse_error(err, in, name, l, loc.pos);
     }
 
@@ -971,14 +973,16 @@ public:
         : p(q), msg(s), rank(q.rank), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
+        int x = in.get_pos();
+
         bool const b = p(in, result);
 
         if (b) {
-            cout << msg << ": succ(";
+            cout << "<" << msg << ": succ(";
             if (result != nullptr) {
                 cout << *result;
             }
-            cout << ") @" << in.get_pos() << "(" << in.size() << ")\n";
+            cout << ") @" << x << " - " << in.get_pos() << "(" << in.size() << ")\n";
         }
 
         return b;
