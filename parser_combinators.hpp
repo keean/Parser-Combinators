@@ -266,19 +266,23 @@ class pstream {
     vector<location> stack;
     
     location loc;
+    int end;
     int sym;
 
 public:
-    pstream(istream &f) : in(f.rdbuf()), sym(in->sgetc()) {}
+    pstream(istream &f) : in(f.rdbuf()), end(0), sym(in->sgetc()) {}
 
     void error(string const& err, string const& name, location const& l) {
-        throw parse_error(err, in, name, l, loc.pos);
+        throw parse_error(err, in, name, l, end);
     }
 
     void next() {
         in->snextc();
         sym = in->sgetc();
         ++loc.pos;
+        if (loc.pos > end) {
+            end = loc.pos;
+        }
         if (sym == '\n') {
             ++loc.row;
             loc.col = 0;
@@ -979,6 +983,7 @@ public:
 
         if (b) {
             cout << "<" << msg << ": succ(";
+
             if (result != nullptr) {
                 cout << *result;
             }
@@ -1098,7 +1103,7 @@ template <typename P> auto option(P const& p)
 //----------------------------------------------------------------------------
 // Accept the parser one or more times.
 
-template <typename P> auto some (P const& p)
+template <typename P> auto some(P const& p)
 -> decltype(name("{" + p.name + "}-", p && many(p))) {
     return name("{" + p.name + "}-", p && many(p));
 }
