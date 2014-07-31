@@ -982,12 +982,12 @@ public:
         bool const b = p(in, result);
 
         if (b) {
-            cout << "<" << msg << ": succ(";
+            cout << msg << ": ";
 
             if (result != nullptr) {
                 cout << *result;
             }
-            cout << ") @" << x << " - " << in.get_pos() << "(" << in.size() << ")\n";
+            cout << " @" << x << " - " << in.get_pos() << "(" << in.size() << ")\n";
         }
 
         return b;
