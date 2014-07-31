@@ -3,4 +3,4 @@ Parser-Combinators
 
 C++ parser combinator library
 
-See "test_conbinators.cpp" for a usage example.
+See "test_combinators.cpp" for a usage example.
