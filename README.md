@@ -1,7 +1,7 @@
 Parser-Combinators
 ==================
 
-A high performance C++ parser combinator library, focusing on static instamtiation of combinators. The library design ensures that all combinator composition occurs at compile time, with a special construct (a parser_handle) used to allow dynamic runtime polymorphism at specific points.
+A high performance C++ parser combinator library, focusing static instamtiation of combinators, which differentiates it from other libraries such as Boost.Spirit. The library design ensures that all combinator composition occurs at compile time, with a special construct (a parser_handle) used to allow dynamic runtime polymorphism at specific points.
 
 As backtraking is supported, parsers can generally consist of a set of independent static parse rules, and a single parser handle to enable polymorphic recursion. However higher level parser combinators can also be implemented that take parser handles as their arguments.
 
