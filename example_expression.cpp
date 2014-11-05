@@ -89,7 +89,7 @@ public:
             b = parser(in, &a);
         } catch (parse_error& e) {
             stringstream err;
-            err << e;
+            err << e.what();
             throw runtime_error(err.str());
         }
 
