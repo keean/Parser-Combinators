@@ -977,18 +977,18 @@ public:
         : p(q), msg(s), rank(q.rank), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
-        //int x = in.get_pos();
+        int x = in.get_pos();
 
         bool const b = p(in, result);
 
-        /*if (b) {
+        if (b) {
             cout << msg << ": ";
 
             if (result != nullptr) {
                 cout << *result;
             }
             cout << " @" << x << " - " << in.get_pos() << "(" << in.size() << ")\n";
-        }*/
+        }
 
         return b;
     }
