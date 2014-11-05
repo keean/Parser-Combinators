@@ -72,11 +72,11 @@ parser_handle<int> const expression = attempt(
         && discard(end_tok))
     || all(return_int, number_tok);
 
-class csv_parser {
+class expression_parser {
     pstream in;
 
 public:
-    csv_parser(fstream &fs) : in(fs) {}
+    expression_parser(fstream &fs) : in(fs) {}
 
     int operator() () {
         auto const parser = strict("invalid expression", expression);
@@ -116,10 +116,10 @@ int main(int const argc, char const *argv[]) {
             cout << argv[i] << "\n";
 
             if (in.is_open()) {
-                csv_parser csv(in);
-                profile<csv_parser>::reset();
-                int const chars_read = csv();
-                double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<csv_parser>::report());
+                expression_parser expression(in);
+                profile<expression_parser>::reset();
+                int const chars_read = expression();
+                double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<expression_parser>::report());
                 cout << "parsed: " << mb_per_s << "MB/s\n";
             }
         }
