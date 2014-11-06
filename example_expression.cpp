@@ -79,13 +79,13 @@ public:
     expression_parser(fstream &fs) : in(fs) {}
 
     int operator() () {
-        auto const parser = strict("invalid expression", expression);
+        auto const parser = strict("invalid expression", next_token && expression);
 
         decltype(parser)::result_type a {}; 
 
         bool b;
         try {
-            profile<csv_parser> p;
+            profile<expression_parser> p;
             b = parser(in, &a);
         } catch (parse_error& e) {
             stringstream err;
@@ -101,7 +101,7 @@ public:
 
         cout << a << "\n";
         
-        return in.get_pos();
+        return in.get_location().pos;
     }
 };
 

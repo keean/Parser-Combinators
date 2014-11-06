@@ -292,12 +292,8 @@ public:
         }
     }
 
-    location get_location() {
+    location const& get_location() {
         return loc;
-    }
-
-    int get_pos() {
-        return loc.pos;
     }
 
     int get_sym() {
@@ -648,7 +644,7 @@ public:
         if (p1(in, result)) {
             return true;
         }
-        int const end = in.get_pos();
+        int const end = in.get_location().pos;
         if (start.pos != end) {
             in.error("failed parser consumed input", p1.name, start);
         }
@@ -715,7 +711,7 @@ public:
         while (p(in, result)) {
             start = in.get_location();
         }
-        int const end = in.get_pos();
+        int const end = in.get_location().pos;
         if (start.pos != end) {
             in.error("failed parser consumed input", p.name, start);
         }
@@ -977,7 +973,7 @@ public:
         : p(q), msg(s), rank(q.rank), name(q.name) {}
 
     bool operator() (pstream &in, result_type *result = nullptr) const {
-        int x = in.get_pos();
+        location const x = in.get_location();
 
         bool const b = p(in, result);
 
@@ -987,7 +983,7 @@ public:
             if (result != nullptr) {
                 cout << *result;
             }
-            cout << " @" << x << " - " << in.get_pos() << "(" << in.size() << ")\n";
+            cout << " @" << x.pos << " - " << in.get_location().pos << "(" << in.size() << ")\n";
         }
 
         return b;
@@ -1109,10 +1105,23 @@ template <typename P> auto some(P const& p)
 }
 
 //----------------------------------------------------------------------------
+// Accept one parser separated by another
+
+template <typename P, typename Q> auto sep_by(P const& p, Q const& q) 
+-> decltype(name(p.name + " {" + q.name + ", " + p.name + "}",
+        p && many(discard(q) && p))) {
+    return name(p.name + " {" + q.name + ", " + p.name + "}",
+        p && many(discard(q) && p));
+}
+
+//----------------------------------------------------------------------------
 // Lazy Tokenisation.
 
+// skip to start of next token.
+auto next_token = discard(many(accept(is_space)));
+
 template <typename R> auto tokenise (R const& r)
--> decltype(name(r.name, discard(many(accept(is_space))) && r)) {
-    return name(r.name, discard(many(accept(is_space))) && r);
+-> decltype(name(r.name, r && next_token)) {
+    return name(r.name, r && next_token);
 }
 

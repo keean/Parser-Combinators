@@ -28,7 +28,10 @@ struct parse_line {
 
 auto const number_tok = tokenise(some(accept(is_digit)));
 auto const separator_tok = tokenise(accept(is_char(',')));
-auto const parse_csv = strict("error parsing csv", some(all(parse_line, some(all(parse_int, number_tok) && discard(separator_tok)))));
+
+auto const parse_csv = strict("error parsing csv",
+    next_token && some(all(parse_line, sep_by(all(parse_int, number_tok), separator_tok)))
+);
 
 class csv_parser {
     pstream in;
@@ -45,7 +48,7 @@ public:
             b = parse_csv(in, &a);
         } catch (parse_error& e) {
             stringstream err;
-            err << e;
+            err << e.what();
             throw runtime_error(err.str());
         }
 
@@ -57,7 +60,7 @@ public:
 
         //cout << a << "\n";
         
-        return in.get_pos();
+        return in.get_location().pos;
     }
 };
 
