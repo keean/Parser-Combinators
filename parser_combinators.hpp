@@ -1115,7 +1115,11 @@ template <typename P, typename Q> auto sep_by(P const& p, Q const& q)
 }
 
 //----------------------------------------------------------------------------
-// Lazy Tokenisation.
+// Lazy Tokenisation, by skipping the whitespace after each token we leave 
+// the input stream in a position where parsers can fail on the first
+// character without requiring backtracking. This requires using the 
+// "next_token" parser as the first parser to initialise lazy tokenization
+// properly.
 
 // skip to start of next token.
 auto next_token = discard(many(accept(is_space)));
