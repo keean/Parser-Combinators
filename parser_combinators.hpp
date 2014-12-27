@@ -977,6 +977,7 @@ public:
 
         bool const b = p(in, result);
 
+#ifdef DEBUG
         if (b) {
             cout << msg << ": ";
 
@@ -985,6 +986,7 @@ public:
             }
             cout << " @" << x.pos << " - " << in.get_location().pos << "(" << in.size() << ")\n";
         }
+#endif
 
         return b;
     }

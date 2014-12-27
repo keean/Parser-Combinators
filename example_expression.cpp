@@ -43,7 +43,7 @@ struct return_mul {
 struct return_div {
     return_div() {}
     void operator() (int *res, int left, string&, int right) const {
-        *res = left / right;
+        *res = (right == 0) ? 0 : left / right;
     }
 } const return_div;
 
@@ -55,17 +55,19 @@ auto const sub_tok = tokenise(accept(is_char('-')));
 auto const mul_tok = tokenise(accept(is_char('*')));
 auto const div_tok = tokenise(accept(is_char('/')));
 
-parser_handle<int> const additive_expr(parser_handle<int> e) {
+using expression_handle = parser_handle<int>;
+
+expression_handle const additive_expr(expression_handle e) {
     return log("+", attempt(all(return_add, e, add_tok, e)))
         || log("-", all(return_sub, e, sub_tok, e));
 }
 
-parser_handle<int> const multiplicative_expr(parser_handle<int> e) {
+expression_handle const multiplicative_expr(expression_handle e) {
     return log("*", attempt(all(return_mul, e, mul_tok, e)))
         || log("/", all(return_div, e, div_tok, e));
 }
 
-parser_handle<int> const expression = attempt(
+expression_handle const expression = attempt(
         discard(start_tok)
         && (attempt(additive_expr(reference("expr", expression)))
             || multiplicative_expr(reference("expr", expression)))
