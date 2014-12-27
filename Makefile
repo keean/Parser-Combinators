@@ -1,23 +1,10 @@
-all: test_simple test_combinators example_expression test.csv test.exp
+all: test_simple test_combinators example_expression test.csv test.exp mkcsv mkexp
 
 debug: CFLAGS+="-DDEBUG"
 debug: all
 
-test.csv:
-	printf "" > test.csv; \
-	for j in $$(seq 1 10000); do \
-	for i in $$(seq 1 999); do \
-	printf "$$[($$RANDOM % 10) + 1], " >> test.csv; \
-	done; \
-	printf "$$[($$RANDOM % 10) + 1]\n" >> test.csv; \
-	done;
-
-test.exp: mkexp
-	./mkexp > test.exp
-	
-
 clean:
-	rm -f test_combinators test_simple example_expression test.csv mkexp test.exp
+	rm -f test_combinators test_simple example_expression test.csv mkexp test.exp mkcsv
 
 test_combinators: test_combinators.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp
 	clang++ ${CFLAGS} -ggdb -march=native -O3 -flto -std=c++11 -o test_combinators test_combinators.cpp
@@ -30,3 +17,13 @@ example_expression: example_expression.cpp templateio.hpp parser_combinators.hpp
 
 mkexp: mkexp.cpp
 	clang++ ${CFLAGS} -ggdb -march=native -O3 -flto -std=c++11 -o mkexp mkexp.cpp
+
+mkcsv: mkcsv.cpp
+	clang++ ${CFLAGS} -ggdb -march=native -O3 -flto -std=c++11 -o mkcsv mkcsv.cpp
+
+test.csv: mkcsv
+	./mkcsv > test.csv
+
+test.exp: mkexp
+	./mkexp > test.exp
+	

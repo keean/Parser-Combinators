@@ -58,7 +58,14 @@ public:
             cout << "FAIL\n";
         }
 
-        //cout << a << "\n";
+        int sum = 0;
+        for (int i = 0; i < a.size(); ++i) {
+            for (int j = 0; j < a[i].size(); j++) {
+               sum += a[i][j];
+            }
+        }
+        sum /= a.size();
+        cerr << sum << endl;
         
         return in.get_location().pos;
     }
