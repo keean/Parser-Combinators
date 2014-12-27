@@ -82,20 +82,10 @@ public:
 
     int operator() () {
         auto const parser = strict("invalid expression", next_token && expression);
-
         decltype(parser)::result_type a {}; 
 
-        bool b;
-        try {
-            profile<expression_parser> p;
-            b = parser(in, &a);
-        } catch (parse_error& e) {
-            stringstream err;
-            err << e.what();
-            throw runtime_error(err.str());
-        }
-
-        if (b) {
+        profile<expression_parser> p;
+        if (parser(in, &a)) {
             cout << "OK\n";
         } else {
             cout << "FAIL\n";
