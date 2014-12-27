@@ -6,6 +6,7 @@
 #include "templateio.hpp"
 #include "parser_combinators.hpp"
 #include "profile.hpp"
+#include "stream_iterator.hpp"
 
 using namespace std;
 
@@ -30,46 +31,34 @@ auto const number_tok = tokenise(some(accept(is_digit)));
 auto const separator_tok = tokenise(accept(is_char(',')));
 
 auto const parse_csv = strict("error parsing csv",
-    next_token && some(all(parse_line, sep_by(all(parse_int, number_tok), separator_tok)))
+    first_token && some(all(parse_line, sep_by(all(parse_int, number_tok), separator_tok)))
 );
 
-class csv_parser {
-    pstream in;
+struct csv_parser;
 
-public:
-    csv_parser(fstream &fs) : in(fs) {}
+template <typename InputIterator>
+int parse(InputIterator i, InputIterator const last) {
+    decltype(parse_csv)::result_type a; 
+    InputIterator const first = i;
 
-    int operator() () {
-        decltype(parse_csv)::result_type a; 
-
-        bool b;
-        try {
-            profile<csv_parser> p;
-            b = parse_csv(in, &a);
-        } catch (parse_error& e) {
-            stringstream err;
-            err << e.what();
-            throw runtime_error(err.str());
-        }
-
-        if (b) {
-            cout << "OK\n";
-        } else {
-            cout << "FAIL\n";
-        }
-
-        int sum = 0;
-        for (int i = 0; i < a.size(); ++i) {
-            for (int j = 0; j < a[i].size(); j++) {
-               sum += a[i][j];
-            }
-        }
-        sum /= a.size();
-        cerr << sum << endl;
-        
-        return in.get_location().pos;
+    profile<csv_parser> p;
+    if (parse_csv(i, last, &a)) {
+        cout << "OK\n";
+    } else {
+        cout << "FAIL\n";
     }
-};
+
+    int sum = 0;
+    for (int i = 0; i < a.size(); ++i) {
+        for (int j = 0; j < a[i].size(); j++) {
+           sum += a[i][j];
+        }
+    }
+    sum /= a.size();
+    cerr << sum << endl;
+    
+    return i - first;
+}
 
 //----------------------------------------------------------------------------
 
@@ -82,9 +71,9 @@ int main(int const argc, char const *argv[]) {
             cout << argv[i] << "\n";
 
             if (in.is_open()) {
-                csv_parser csv(in);
                 profile<csv_parser>::reset();
-                int const chars_read = csv();
+                stream_range  r(in.rdbuf());
+                int const chars_read = parse(r.cbegin(), r.cend());
                 double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<csv_parser>::report());
                 cout << "parsed: " << mb_per_s << "MB/s\n";
             }
