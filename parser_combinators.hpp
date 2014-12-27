@@ -208,16 +208,25 @@ struct parse_error : public runtime_error {
     static string message(string const& what,string const& pb,
         InputIterator const &f, InputIterator const &l, InputIterator const &ll
     ) {
-        InputIterator z;
-        cout << "[" << f - z << " - " << l - z << "]" << endl;
         stringstream err;
-        err << what << endl;
 
-        InputIterator sof;
-        InputIterator line_start(f);
-        while ((*line_start != '\n') && (line_start - sof != 0)) {
-            --line_start;
+        InputIterator ff(f);
+        ff = 0;
+        InputIterator line_start(ff);
+        int row = 1;
+        while ((ff != f) && (ff != ll)) {
+            if (*ff == '\n') {
+                ++row;
+                ++ff;
+                line_start = ff;
+            } else {
+                ++ff;
+            }
         }
+
+        err << what << " at line: " << row
+            << " column: " << f - line_start + 1 << endl;
+
         for (InputIterator i(line_start); (*i != '\n') && (i != ll); ++i) {
             err << static_cast<char>(*i);
         }
@@ -236,8 +245,10 @@ struct parse_error : public runtime_error {
                 err << '-';
                 ++i;
             }
-            err << "^" << endl << pb << endl;
+            err << "^";
         }
+        
+        err << endl << pb << endl;
 
         return err.str();
     }

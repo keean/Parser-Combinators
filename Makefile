@@ -6,13 +6,13 @@ debug: all
 clean:
 	rm -f test_combinators test_simple example_expression test.csv mkexp test.exp mkcsv
 
-test_combinators: test_combinators.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp
+test_combinators: test_combinators.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp stream_iterator.hpp
 	clang++ ${CFLAGS} -ggdb -march=native -O3 -flto -std=c++11 -o test_combinators test_combinators.cpp
 
 test_simple: test_simple.cpp templateio.hpp parser_simple.hpp profile.hpp
 	clang++ ${CFLAGS} -ggdb -march=native -O3 -flto -std=c++11 -o test_simple test_simple.cpp
 
-example_expression: example_expression.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp
+example_expression: example_expression.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp stream_iterator.hpp
 	clang++ ${CFLAGS} -ggdb -march=native -O3 -flto -std=c++11 -o example_expression example_expression.cpp
 
 mkexp: mkexp.cpp
