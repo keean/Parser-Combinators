@@ -45,6 +45,15 @@ public:
             return *this;
         }
 
+        const_iterator& operator-- () {
+            --pos;
+            if (r->pos != pos) { 
+                r->pos = r->rd->pubseekoff(pos, ios_base::beg);
+            }
+            sym = r->rd->sgetc();
+            return *this;
+        }
+
         const_iterator& operator= (const_iterator const& i) {
             pos = i.pos;
             sym = i.sym;
@@ -65,4 +74,3 @@ public:
     }
 };
      
-

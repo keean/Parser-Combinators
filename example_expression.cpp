@@ -69,18 +69,18 @@ expression_handle const multiplicative_expr(expression_handle e) {
         || log("/", all(return_div, e, div_tok, e));
 }
 
-expression_handle const expression = attempt(
+expression_handle const expression = strict("invalid subexpression", attempt(
         discard(start_tok)
         && (attempt(additive_expr(reference("expr", expression)))
             || multiplicative_expr(reference("expr", expression)))
         && discard(end_tok))
-    || all(return_int, number_tok);
+    || all(return_int, number_tok));
 
 struct expression_parser;
 
 template <typename InputIterator>
 int parse(InputIterator i, InputIterator const last) {
-    auto const parser = strict("invalid expression", first_token && expression);
+    auto const parser = first_token && expression;
     decltype(parser)::result_type a {}; 
     InputIterator const first = i;
 

@@ -206,35 +206,46 @@ struct parse_error : public runtime_error {
 
     template <typename InputIterator>
     static string message(string const& what,string const& pb,
-        InputIterator const &lf, InputIterator const &mf, InputIterator const &ml
+        InputIterator const &f, InputIterator const &l, InputIterator const &ll
     ) {
-        cout << "ERROR" << endl;
+        InputIterator z;
+        cout << "[" << f - z << " - " << l - z << "]" << endl;
         stringstream err;
         err << what << endl;
-        for (InputIterator i(lf); (*i != '\n') && (*i != EOF); ++i) {
-            cout << *i;
-            err << *i;
+
+        InputIterator sof;
+        InputIterator line_start(f);
+        while ((*line_start != '\n') && (line_start - sof != 0)) {
+            --line_start;
+        }
+        for (InputIterator i(line_start); (*i != '\n') && (i != ll); ++i) {
+            err << static_cast<char>(*i);
         }
         err << endl;
 
-        for (InputIterator i(lf); i != mf; ++i) {
-            cout << '*';
+        InputIterator i(line_start);
+        while ((i != f) && (i != ll)) {
             err << ' ';
+            ++i;
         }
         err << '^';
 
-        //for (InputIterator i(mf); i != ml; ++i) {
-        //    cout << '#';
-        //    err << '-';
-        //}
-        err << "^" << endl << pb << endl;
+        if ((i != l) && (i != ll)) {
+            ++i;
+            while ((i != l) && (i != ll)) {
+                err << '-';
+                ++i;
+            }
+            err << "^" << endl << pb << endl;
+        }
+
         return err.str();
     }
 
     template <typename InputIterator>
-    parse_error(string const& what,string const& pb,
-        InputIterator const &lf, InputIterator const &mf, InputIterator const &ml
-    ) : runtime_error(message(what, pb, lf, mf, ml)) {}
+    parse_error(string const& what, string const& pb,
+        InputIterator const &f, InputIterator const &l, InputIterator const &ll
+    ) : runtime_error(message(what, pb, f, l, ll)) {}
 };
 
 //============================================================================
@@ -467,7 +478,7 @@ private:
                 try {
                     f(result, j, get<I>(tmp)...);
                 } catch (runtime_error &e) {
-                    throw parse_error(e.what(), name, first, first, i);
+                    throw parse_error(e.what(), name, first, i, last);
                 }
             }
             return true;
@@ -541,7 +552,7 @@ private:
                 try {
                     f(result, get<I>(tmp)...);
                 } catch (runtime_error &e) {
-                    throw parse_error(e.what(), name, first, first, i);
+                    throw parse_error(e.what(), name, first, i, l);
                 }
             }
             return true;
@@ -594,7 +605,7 @@ public:
             return true;
         }
         if (first != i) {
-            throw parse_error("failed parser consumed input", p1.name, first, first, i);
+            throw parse_error("failed parser consumed input", p1.name, first, i, l);
         }
         if (p2(i, l, result)) {
             return true;
@@ -664,7 +675,7 @@ public:
         if (first != i) {
             cout << *first << endl;
             cout << *i << endl;
-            throw parse_error("failed many-parser consumed input", p.name, first, first, i);
+            throw parse_error("failed many-parser consumed input", p.name, first, i, last);
         }
         return true;
     }
@@ -940,7 +951,9 @@ public:
             if (result != nullptr) {
                 cout << *result;
             }
-            cout << " @" << x << " - " << i << "\n";
+
+            InputIterator z;
+            cout << " @" << (x - z) << " - " << (i - z) << "\n";
         }
 #endif
 
@@ -1006,7 +1019,7 @@ public:
     bool operator() (InputIterator &i, InputIterator const &last, result_type *result = nullptr) const {
         InputIterator const first = i;
         if (!p(i, last, result)) {
-            throw parse_error(err, p.name, first, first, i);
+            throw parse_error(err, p.name, first, i, last);
         }
         return true;
     }
