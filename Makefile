@@ -17,7 +17,7 @@ test.exp: mkexp
 	
 
 clean:
-	rm -f test_combinators test_simple example_expression test.csv
+	rm -f test_combinators test_simple example_expression test.csv mkexp test.exp
 
 test_combinators: test_combinators.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp
 	clang++ ${CFLAGS} -ggdb -march=native -O3 -flto -std=c++11 -o test_combinators test_combinators.cpp
