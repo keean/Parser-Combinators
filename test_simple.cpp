@@ -59,12 +59,19 @@ struct csv_parser : private parser {
         vector<vector<int>> a;
 
         if (parse_csv(a)) {
-            cout << "OK\n";
+            cout << "OK" << endl;
         } else {
-            cout << "FAIL\n";
+            cout << "FAIL" << endl;
         }
 
-        // cout << a << "\n";
+        int sum = 0;
+        for (int i = 0; i < a.size(); ++i) {
+            for (int j = 0; j < a[i].size(); ++j) {
+                sum += a[i][j];
+            }
+        }
+        sum /= a.size();
+        cerr << sum << endl;
         
         return get_count(); 
     }
@@ -74,19 +81,19 @@ struct csv_parser : private parser {
 
 int main(int const argc, char const *argv[]) {
     if (argc < 1) {
-        cerr << "no input files\n";
+        cerr << "no input files" << endl;
     } else {
         for (int i = 1; i < argc; ++i) {
             try {
                 fstream in(argv[i], ios_base::in);
-                cout << argv[i] << "\n";
+                cout << argv[i] << endl;
 
                 if (in.is_open()) {
                     csv_parser csv(in);
                     profile<csv_parser>::reset();
                     int const chars_read = csv();
                     double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<csv_parser>::report());
-                    cout << "parsed: " << mb_per_s << "MB/s\n";
+                    cout << "parsed: " << mb_per_s << "MB/s" << endl;
                 }
             } catch (parse_error& e) {
                 cerr << argv[i] << ": " << e.what()
@@ -98,7 +105,7 @@ int main(int const argc, char const *argv[]) {
                     cerr << "0x" << hex << e.sym;
                 }
                 cerr << " at line " << e.row
-                    << ", column " << e.col << "\n";
+                    << ", column " << e.col << endl;
                 return 2;
             }
         }
