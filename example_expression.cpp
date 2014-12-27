@@ -43,7 +43,7 @@ struct return_mul {
 struct return_div {
     return_div() {}
     void operator() (int *res, int left, string&, int right) const {
-        *res = (right == 0) ? 0 : left / right;
+        *res = left / right;
     }
 } const return_div;
 
