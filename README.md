@@ -1,7 +1,7 @@
 Parser-Combinators
 ==================
 
-<b>The latest version now uses an Iterator and Range pair, and provides a stream_range that makes backtracking much neater in the implementation, results in a 25% performance improvement on non-backtracking parsers, and even more (40% improvement) on backtracking parsers. The combinator parser with stream iterator is now about twice the speed of the simple recursive descent parse, and iterator interface can be used with the File-Vector which doubles the performance again (see "vector_expression.cpp" example).</b>
+<b>The latest version now uses an Iterator and Range pair, and provides a stream_range that makes backtracking much neater in the implementation, results in a 25% performance improvement compared to the pre-iterator version on non-backtracking parsers, and even more (40% improvement) on backtracking parsers. The combinator parser with stream iterator is now about twice the speed of the simple recursive descent parse, and iterator interface can be used with the File-Vector which doubles the performance again (see "vector_expression.cpp" example).</b>
 
 A high performance C++ parser combinator library, focusing static instantiation of combinators, which differentiates it from other libraries such as Boost.Spirit. The library design ensures that all combinator composition occurs at compile time, with a special construct (a parser-handle) used to allow dynamic runtime polymorphism at specific points.
 
