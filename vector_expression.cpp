@@ -6,7 +6,7 @@
 #include "templateio.hpp"
 #include "parser_combinators.hpp"
 #include "profile.hpp"
-#include "stream_iterator.hpp"
+#include "File-Vector/file_vector.hpp"
 
 using namespace std;
 
@@ -56,8 +56,9 @@ auto const sub_tok = tokenise(accept(is_char('-')));
 auto const mul_tok = tokenise(accept(is_char('*')));
 auto const div_tok = tokenise(accept(is_char('/')));
 
-using stream_iterator = stream_range::const_iterator;
-using expression_handle = parser_handle<stream_iterator, int>;
+using stream_iterator = file_vector<char>::const_iterator;
+using stream_range = file_vector<char>::const_range;
+using expression_handle = parser_handle<stream_iterator, stream_range, int>;
 
 expression_handle const additive_expr(expression_handle e) {
     return log("+", attempt(all(return_add, e, add_tok, e)))
@@ -78,14 +79,14 @@ expression_handle const expression = strict("invalid subexpression", attempt(
 
 struct expression_parser;
 
-template <typename InputIterator>
-int parse(InputIterator i, InputIterator const last) {
+template <typename Range>
+int parse(Range &r) {
     auto const parser = first_token && expression;
     decltype(parser)::result_type a {}; 
-    InputIterator const first = i;
+    typename Range::iterator i = r.first;
 
     profile<expression_parser> p;
-    if (parser(i, last, &a)) {
+    if (parser(i, r, &a)) {
         cout << "OK\n";
     } else {
         cout << "FAIL\n";
@@ -93,7 +94,7 @@ int parse(InputIterator i, InputIterator const last) {
 
     cout << a << "\n";
     
-    return i - first;
+    return i - r.first;
 }
 
 //----------------------------------------------------------------------------
@@ -103,16 +104,14 @@ int main(int const argc, char const *argv[]) {
         cerr << "no input files\n";
     } else {
         for (int i = 1; i < argc; ++i) {
-            fstream in(argv[i], ios_base::in);
+            file_vector<char> f(argv[i]);
             cout << argv[i] << "\n";
 
-            if (in.is_open()) {
-                profile<expression_parser>::reset();
-                stream_range r(in.rdbuf());
-                int const chars_read = parse(r.cbegin(), r.cend());
-                double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<expression_parser>::report());
-                cout << "parsed: " << mb_per_s << "MB/s\n";
-            }
+            profile<expression_parser>::reset();
+            stream_range r(f.const_all());
+            int const chars_read = parse(r);
+            double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<expression_parser>::report());
+            cout << "parsed: " << mb_per_s << "MB/s\n";
         }
     }
 }

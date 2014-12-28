@@ -36,13 +36,13 @@ auto const parse_csv = strict("error parsing csv",
 
 struct csv_parser;
 
-template <typename InputIterator>
-int parse(InputIterator i, InputIterator const last) {
+template <typename Range>
+int parse(Range &r) {
     decltype(parse_csv)::result_type a; 
-    InputIterator const first = i;
+    typename Range::iterator i = r.first;
 
     profile<csv_parser> p;
-    if (parse_csv(i, last, &a)) {
+    if (parse_csv(i, r, &a)) {
         cout << "OK\n";
     } else {
         cout << "FAIL\n";
@@ -57,7 +57,7 @@ int parse(InputIterator i, InputIterator const last) {
     sum /= a.size();
     cerr << sum << endl;
     
-    return i - first;
+    return i - r.first;
 }
 
 //----------------------------------------------------------------------------
@@ -73,7 +73,7 @@ int main(int const argc, char const *argv[]) {
             if (in.is_open()) {
                 profile<csv_parser>::reset();
                 stream_range  r(in.rdbuf());
-                int const chars_read = parse(r.cbegin(), r.cend());
+                int const chars_read = parse(r);
                 double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<csv_parser>::report());
                 cout << "parsed: " << mb_per_s << "MB/s\n";
             }
