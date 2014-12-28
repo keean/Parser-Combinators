@@ -4,7 +4,7 @@ debug: CFLAGS+="-DDEBUG"
 debug: all
 
 clean:
-	rm -f test_combinators test_simple example_expression test.csv mkexp test.exp mkcsv
+	rm -f test_combinators test_simple stream_expression vector_expression test.csv mkexp test.exp mkcsv 
 
 test_combinators: test_combinators.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp stream_iterator.hpp
 	clang++ ${CFLAGS} -ggdb -march=native -O3 -flto -std=c++11 -o test_combinators test_combinators.cpp
