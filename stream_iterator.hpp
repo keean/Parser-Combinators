@@ -36,11 +36,12 @@ public:
 
         iterator& operator++ () {
             if (r->pos != pos) {
-                r->pos = r->rd->pubseekoff(pos, ios_base::beg);
-            } 
-            sym = r->rd->snextc();
-            ++(r->pos);
-            ++pos;
+                r->pos = r->rd->pubseekoff(++pos, ios_base::beg);
+                sym = r->rd->sgetc();
+            } else {
+                r->pos = ++pos;
+                sym = r->rd->snextc();
+            }
             return *this;
         }
 
