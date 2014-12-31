@@ -138,7 +138,7 @@ class parser {
     }
 
 public:
-    parser(istream &f) : in(f.rdbuf()), row(1), col(1), sym(in->sbumpc()) {}
+    parser(istream &f) : in(f.rdbuf()), count(0), row(1), col(1), sym(in->sbumpc()) {}
 
 protected:
     int get_col() {
