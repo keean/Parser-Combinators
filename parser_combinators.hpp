@@ -206,7 +206,7 @@ struct parse_error : public runtime_error {
 
     template <typename Iterator, typename Range>
     static string message(string const& what, string const& pb,
-        Iterator const &f, Iterator const &l, Range &r
+        Iterator const &f, Iterator const &l, Range const &r
     ) {
         stringstream err;
 
@@ -344,7 +344,7 @@ public:
     template <typename Iterator, typename Range>
     bool operator() (
         Iterator &i,
-        Range &r,
+        Range const &r,
         string *result = nullptr
     ) const {
         if (i == r.last) {
@@ -384,7 +384,7 @@ public:
     template <typename Iterator, typename Range>
     bool operator() (
         Iterator &i,
-        Range &r,
+        Range const &r,
         string *result = nullptr
     ) const {
         for (auto j = s.begin(); j != s.end(); ++j) {
@@ -415,7 +415,7 @@ struct parser_succ {
     parser_succ() {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, void *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, void *result = nullptr) const {
         return true;
     }
 } const succ;
@@ -432,7 +432,7 @@ struct parser_fail {
     parser_fail() {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, void *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, void *result = nullptr) const {
         return false;
     }
 } const fail;
@@ -457,7 +457,7 @@ private:
     Functor const f;
 
     template <typename Iterator, typename Range, typename Rs, size_t I0, size_t... Is> 
-    int any_parsers(Iterator &i, Range &r, Rs &rs, size_t, size_t...) const {
+    int any_parsers(Iterator &i, Range const &r, Rs &rs, size_t, size_t...) const {
         if (get<I0>(ps)(i, r, &get<I0>(rs))) {
             return I0;
         }
@@ -465,7 +465,7 @@ private:
     }
 
     template <typename Iterator, typename Range, typename Rs, size_t I0>
-    int any_parsers(Iterator &i, Range &r, Rs &rs, size_t) const {
+    int any_parsers(Iterator &i, Range const &r, Rs &rs, size_t) const {
         if (get<I0>(ps)(i, r, &get<I0>(rs))) {
             return I0;
         }
@@ -474,7 +474,7 @@ private:
 
     template <typename Iterator, typename Range, size_t... I> bool fmap_any(
         Iterator &i,
-        Range &r,
+        Range const &r,
         size_sequence<I...> seq,
         result_type *result
     ) const {
@@ -503,7 +503,7 @@ public:
 
     template <typename Iterator, typename Range,
         typename Is = typename range<0, sizeof...(Parsers)>::type>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         return fmap_any(i, r, Is(), result);
     }
 };
@@ -530,7 +530,7 @@ private:
     Functor const f;
 
     template <typename Iterator, typename Range, typename Rs, size_t I0, size_t... Is> 
-    bool all_parsers(Iterator &i, Range &r, Rs &rs, size_t, size_t...) const {
+    bool all_parsers(Iterator &i, Range const &r, Rs &rs, size_t, size_t...) const {
         if (get<I0>(ps)(i, r, &get<I0>(rs))) {
             return all_parsers<Iterator, Range, Rs, Is...>(i, r, rs, Is...);
         }
@@ -538,13 +538,13 @@ private:
     }
 
     template <typename Iterator, typename Range, typename Rs, size_t I0>
-    bool all_parsers(Iterator &i, Range &r, Rs &rs, size_t) const {
+    bool all_parsers(Iterator &i, Range const &r, Rs &rs, size_t) const {
         return get<I0>(ps)(i, r, &get<I0>(rs));
     }
 
     template <typename Iterator, typename Range, size_t... I> bool fmap_all(
         Iterator &i,
-        Range &r,
+        Range const &r,
         size_sequence<I...> seq,
         result_type *result
     ) const {
@@ -572,7 +572,7 @@ public:
 
     template <typename Iterator, typename Range,
         typename Is = typename range<0, sizeof...(Parsers)>::type>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         return fmap_all(i, r, Is(), result);
     }
 };
@@ -602,7 +602,7 @@ public:
         , name(format_name(p1, rank) + " | " + format_name(p2, rank)) {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         Iterator const first = i;
         if (p1(i, r, result)) {
             return true;
@@ -642,7 +642,7 @@ public:
         , name(format_name(p1, rank) +  ", " + format_name(p2, rank)) {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         return p1(i, r, result) && p2(i, r, result);
     }
 };
@@ -670,7 +670,7 @@ public:
     explicit combinator_many(Parser const& p) : p(p), name("{" + p.name + "}") {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         Iterator first = i;
         while (p(i, r, result)) {
             first = i;
@@ -704,7 +704,7 @@ public:
         : p(p), x(x), name(p.name + " - \"" + x + "\"") {}
 
     template <typename Iterator, typename Range> 
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         if (p(i, r, result)) {
             if (result != nullptr) {
                 return x != *result;
@@ -733,7 +733,7 @@ class parser_handle {
     struct holder_base {
         virtual ~holder_base() {}
 
-        virtual bool parse(Iterator& i, Range& r, Result_Type *result = nullptr) const = 0;
+        virtual bool parse(Iterator& i, Range const &r, Result_Type *result = nullptr) const = 0;
     }; 
 
     template <typename Parser>
@@ -744,7 +744,7 @@ class parser_handle {
         explicit holder_poly(Parser const &q) : p(q) {}
         explicit holder_poly(Parser &&q) : p(forward<Parser>(q)) {}
 
-        virtual bool parse(Iterator &i, Range &r, Result_Type *result) const override {
+        virtual bool parse(Iterator &i, Range const &r, Result_Type *result) const override {
             return p(i, r, result);
         }
     };
@@ -796,7 +796,7 @@ public:
         return *this;
     }
 
-    bool operator() (Iterator &i, Range &r, Result_Type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, Result_Type *result = nullptr) const {
         assert(p != nullptr);
         return p->parse(i, r, result);
     }
@@ -858,7 +858,7 @@ public:
         return *this;
     }
 
-    bool operator() (Iterator &i, Range &r, Result_Type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, Result_Type *result = nullptr) const {
         assert(p != nullptr);
         return (*p)(i, r, result);
     }
@@ -882,7 +882,7 @@ public:
     explicit parser_ref(string const& name, Parser const &q) : p(q), name(name) {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         return p(i, r, result);
     }
 };
@@ -911,7 +911,7 @@ public:
         : p(q), rank(q.rank), name(q.name) {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         typename Parser::result_type *const discard_result = nullptr;
         return p(i, r, discard_result);
     }
@@ -940,7 +940,7 @@ public:
         : p(q), msg(s), rank(q.rank), name(q.name) {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         Iterator const x = i;
 
         bool const b = p(i, r, result);
@@ -983,7 +983,7 @@ public:
         : p(q), rank(q.rank), name(q.name) {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         Iterator const first = i;
         if (p(i, r, result)) {
             return true;
@@ -1016,7 +1016,7 @@ public:
         : p(q), err(s), rank(q.rank), name(q.name) {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         Iterator const first = i;
         if (!p(i, r, result)) {
             throw parse_error(err, p.name, first, i, r);
@@ -1047,7 +1047,7 @@ public:
         : p(q), rank(q.rank), name(s) {}
 
     template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range &r, result_type *result = nullptr) const {
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
         return p(i, r, result);
     }
 };

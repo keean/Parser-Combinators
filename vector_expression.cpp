@@ -80,7 +80,7 @@ expression_handle const expression = strict("invalid subexpression", attempt(
 struct expression_parser;
 
 template <typename Range>
-int parse(Range &r) {
+int parse(Range const &r) {
     auto const parser = first_token && expression;
     decltype(parser)::result_type a {}; 
     typename Range::iterator i = r.first;

@@ -37,7 +37,7 @@ auto const parse_csv = strict("error parsing csv",
 struct csv_parser;
 
 template <typename Range>
-int parse(Range &r) {
+int parse(Range const &r) {
     decltype(parse_csv)::result_type a; 
     typename Range::iterator i = r.first;
 
