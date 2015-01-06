@@ -3,10 +3,12 @@
 #include <vector>
 #include <sstream>
 
+#define USE_MMAP
+
 #include "templateio.hpp"
 #include "parser_combinators.hpp"
 #include "profile.hpp"
-#include "File-Vector/file_vector.hpp"
+#include "stream_iterator.hpp"
 
 using namespace std;
 
@@ -56,8 +58,7 @@ auto const sub_tok = tokenise(accept(is_char('-')));
 auto const mul_tok = tokenise(accept(is_char('*')));
 auto const div_tok = tokenise(accept(is_char('/')));
 
-using stream_iterator = file_vector<char>::const_iterator;
-using stream_range = file_vector<char>::const_range;
+using stream_iterator = stream_range::iterator;
 using expression_handle = parser_handle<stream_iterator, stream_range, int>;
 
 expression_handle const additive_expr(expression_handle e) {
@@ -104,12 +105,10 @@ int main(int const argc, char const *argv[]) {
         cerr << "no input files\n";
     } else {
         for (int i = 1; i < argc; ++i) {
-            file_vector<char> f(argv[i]);
-            cout << argv[i] << "\n";
-
             profile<expression_parser>::reset();
-            stream_range r(f.const_all());
-            int const chars_read = parse(r);
+            stream_range in(argv[i]);
+            cout << argv[i] << "\n";
+            int const chars_read = parse(in);
             double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<expression_parser>::report());
             cout << "parsed: " << mb_per_s << "MB/s\n";
         }

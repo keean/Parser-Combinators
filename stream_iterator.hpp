@@ -1,7 +1,30 @@
+#ifdef USE_MMAP
+
+#include "File-Vector/file_vector.hpp"
+
+class stream_range {
+    file_vector<char> file;
+
+public:
+    using iterator = file_vector<char>::const_iterator;
+
+    iterator const last;
+    iterator const first;
+
+    stream_range(stream_range const&) = delete;
+
+    stream_range(char const* name) : file(name), first(file.cbegin()), last(file.cend()) {
+        cout << "using mmap" << endl;
+    }
+};
+
+#else
+
 #include <streambuf>
 #include <fstream>
 
 class stream_range {
+    fstream file;
     streambuf *rd;
     streamoff pos;
 
@@ -67,8 +90,18 @@ public:
     iterator const last;
     iterator const first;
 
-    stream_range(streambuf *rd) : rd(rd), pos(0),
+    stream_range(stream_range const&) = delete;
+
+    stream_range(char const* name) : file(name, ios_base::in),
+        rd(file.rdbuf()), pos(0),
         last(this, rd->pubseekoff(0, ios_base::end)),
-        first(this, rd->pubseekoff(0, ios_base::beg)) {}
+        first(this, rd->pubseekoff(0, ios_base::beg)
+    ) {
+        cout << "using fstream" << endl;
+        if (!file.is_open()) {
+            throw runtime_error("unable to open file");
+        }
+    }
 };
-     
+
+#endif

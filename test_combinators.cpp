@@ -67,16 +67,12 @@ int main(int const argc, char const *argv[]) {
         cerr << "no input files\n";
     } else {
         for (int i = 1; i < argc; ++i) {
-            fstream in(argv[i], ios_base::in);
+            profile<csv_parser>::reset();
+            stream_range in(argv[i]);
             cout << argv[i] << "\n";
-
-            if (in.is_open()) {
-                profile<csv_parser>::reset();
-                stream_range  r(in.rdbuf());
-                int const chars_read = parse(r);
-                double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<csv_parser>::report());
-                cout << "parsed: " << mb_per_s << "MB/s\n";
-            }
+            int const chars_read = parse(in);
+            double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<csv_parser>::report());
+            cout << "parsed: " << mb_per_s << "MB/s\n";
         }
     }
 }
