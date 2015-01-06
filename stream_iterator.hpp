@@ -1,3 +1,6 @@
+#ifndef STREAM_ITERATOR_HPP
+#define STREAM_ITERATOR_HPP
+
 #ifdef USE_MMAP
 
 #include "File-Vector/file_vector.hpp"
@@ -18,7 +21,7 @@ public:
     }
 };
 
-#else
+#else // USE_MMAP
 
 #include <streambuf>
 #include <fstream>
@@ -104,4 +107,5 @@ public:
     }
 };
 
-#endif
+#endif // USE_MMAP
+#endif // STREAM_ITERATOR_HPP
