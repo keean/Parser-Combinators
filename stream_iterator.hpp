@@ -16,9 +16,7 @@ public:
 
     stream_range(stream_range const&) = delete;
 
-    stream_range(char const* name) : file(name), first(file.cbegin()), last(file.cend()) {
-        cout << "using mmap" << endl;
-    }
+    stream_range(char const* name) : file(name), first(file.cbegin()), last(file.cend()) {}
 };
 
 #else // USE_MMAP
@@ -100,7 +98,6 @@ public:
         last(this, rd->pubseekoff(0, ios_base::end)),
         first(this, rd->pubseekoff(0, ios_base::beg)
     ) {
-        cout << "using fstream" << endl;
         if (!file.is_open()) {
             throw runtime_error("unable to open file");
         }
@@ -108,4 +105,7 @@ public:
 };
 
 #endif // USE_MMAP
+
+template <typename T> using pstream_handle = parser_handle<stream_range::iterator, stream_range, T>;
+
 #endif // STREAM_ITERATOR_HPP

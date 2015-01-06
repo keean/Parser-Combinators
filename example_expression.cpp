@@ -56,8 +56,7 @@ auto const sub_tok = tokenise(accept(is_char('-')));
 auto const mul_tok = tokenise(accept(is_char('*')));
 auto const div_tok = tokenise(accept(is_char('/')));
 
-using stream_iterator = stream_range::iterator;
-using expression_handle = parser_handle<stream_iterator, stream_range, int>;
+using expression_handle = pstream_handle<int>;
 
 expression_handle const additive_expr(expression_handle e) {
     return log("+", attempt(all(return_add, e, add_tok, e)))
