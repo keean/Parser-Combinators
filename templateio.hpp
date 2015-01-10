@@ -3,6 +3,9 @@
 // compile with -std=c++11 
 // templateio.h
 
+#ifndef TEMPLATEIO_HPP
+#define TEMPLATEIO_HPP
+
 #include <iostream>
 #include <vector>
 #include <tuple>
@@ -44,3 +47,4 @@ template <typename T> ostream& operator<< (ostream& out, vector<T> const& v) {
     return out << "]";
 }
 
+#endif // TEMPLATEIO_HPP

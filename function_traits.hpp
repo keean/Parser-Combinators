@@ -3,6 +3,9 @@
 // compile with -std=c++11 
 // function-traits.h
 
+#ifndef FUNCTION_TRAITS_HPP
+#define FUNCTION_TRAITS_HPP
+
 #include <tuple>
 
 using namespace std;
@@ -52,3 +55,4 @@ template <typename F> struct function_traits {
     };
 };
 
+#endif // FUNCTION_TRAITS_HPP

@@ -3,6 +3,9 @@
 // compile with -std=c++11 
 // parser_combinators.hpp
 
+#ifndef PARSER_COMBINATORS_HPP
+#define PARSER_COMBINATORS_HPP
+
 #include <istream>
 #include <stdexcept>
 #include <vector>
@@ -347,10 +350,10 @@ public:
         Range const &r,
         string *result = nullptr
     ) const {
+        int sym = *i;
         if (i == r.last) {
-            return false;
+            sym = EOF;
         }
-        char const sym = *i;
         if (!p(sym)) {
             return false;
         }
@@ -1101,4 +1104,4 @@ template <typename R> auto tokenise (R const& r)
     return name(r.name, r && first_token);
 }
 
-
+#endif // PARSER_COMBINATORS_HPP

@@ -3,6 +3,9 @@
 // compile with -std=gnu++11 
 // parser_simple.hpp
 
+#ifndef PARSER_SIMPLE_HPP
+#define PARSER_SIMPLE_HPP
+
 #include <istream>
 #include <stdexcept>
 
@@ -207,3 +210,4 @@ protected:
     }
 };
 
+#endif // PARSER_SIMPLE_HPP

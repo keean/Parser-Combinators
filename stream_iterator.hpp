@@ -1,6 +1,10 @@
 #ifndef STREAM_ITERATOR_HPP
 #define STREAM_ITERATOR_HPP
 
+#include "parser_combinators.hpp"
+
+using namespace std;
+
 #ifdef USE_MMAP
 
 #include "File-Vector/file_vector.hpp"
@@ -17,6 +21,7 @@ public:
     stream_range(stream_range const&) = delete;
 
     stream_range(char const* name) : file(name), first(file.cbegin()), last(file.cend()) {}
+    stream_range(string const& name) : stream_range(name.c_str()) {}
 };
 
 #else // USE_MMAP
@@ -102,6 +107,8 @@ public:
             throw runtime_error("unable to open file");
         }
     }
+
+    stream_range(string const& name) : stream_range(name.c_str()) {}
 };
 
 #endif // USE_MMAP

@@ -3,6 +3,9 @@
 // compile with c++ -std=c++11 
 // profile.h
 
+#ifndef PROFILE_HPP
+#define PROFILE_HPP
+
 #include <ctime>
 
 extern "C" {
@@ -51,3 +54,4 @@ public:
 template<typename T> uint64_t profile<T>::t {1};
 template<typename T> uint64_t profile<T>::s;
 
+#endif // PROFILE_HPP
