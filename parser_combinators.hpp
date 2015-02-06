@@ -338,6 +338,7 @@ template <typename Predicate> class recogniser_accept {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = string;
     int const rank = 0;
     string const name;
@@ -378,6 +379,7 @@ class accept_str {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = string;
     int const rank = 0;
     string const name;
@@ -411,6 +413,7 @@ public:
 
 struct parser_succ {
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = void;
     int const rank = 0;
     string const name = "succ";
@@ -428,6 +431,7 @@ struct parser_succ {
 
 struct parser_fail {
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = void;
     int const rank = 0;
     string const name = "fail";
@@ -453,6 +457,7 @@ template <typename Functor, typename... Parsers> class fmap_choice {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
 
 private:
@@ -526,6 +531,7 @@ template <typename Functor, typename... Parsers> class fmap_sequence {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
 
 private:
@@ -597,6 +603,7 @@ template <typename Parser1, typename Parser2> class combinator_choice {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
     int const rank = 1;
     string const name;
@@ -621,8 +628,10 @@ public:
 };
 
 template <typename P1, typename P2,
-    typename = typename P1::is_parser_type,
-    typename = typename P2::is_parser_type,
+    typename = typename enable_if<is_same<typename P1::is_parser_type, true_type>::value
+        || is_same<typename P1::is_handle_type, true_type>::value>::type,
+    typename = typename enable_if<is_same<typename P2::is_parser_type, true_type>::value
+        || is_same<typename P2::is_handle_type, true_type>::value>::type,
     typename = typename enable_if<is_compatible<typename P1::result_type, typename P2::result_type>::value>::type>
 combinator_choice<P1, P2> const operator|| (P1 const& p1, P2 const& p2) {
     return combinator_choice<P1, P2>(p1, p2);
@@ -637,6 +646,7 @@ template <typename Parser1, typename Parser2> class combinator_sequence {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
     int const rank = 0;
     string const name;
@@ -651,8 +661,10 @@ public:
 };
 
 template <typename P1, typename P2,
-    typename = typename P1::is_parser_type,
-    typename = typename P2::is_parser_type,
+    typename = typename enable_if<is_same<typename P1::is_parser_type, true_type>::value
+        || is_same<typename P1::is_handle_type, true_type>::value>::type,
+    typename = typename enable_if<is_same<typename P2::is_parser_type, true_type>::value
+        || is_same<typename P2::is_handle_type, true_type>::value>::type,
     typename = typename enable_if<is_compatible<typename P1::result_type, typename P2::result_type>::value>::type>
 combinator_sequence<P1, P2> const operator&& (P1 const& p1, P2 const& p2) {
     return combinator_sequence<P1, P2>(p1, p2);
@@ -666,6 +678,7 @@ template <typename Parser> class combinator_many {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank = 0;
     string const name;
@@ -685,7 +698,8 @@ public:
     }
 };
 
-template <typename P, typename = typename P::is_parser_type>
+template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
+    || is_same<typename P::is_handle_type, true_type>::value>::type>
 combinator_many<P> const many(P const& p) {
     return combinator_many<P>(p);
 }
@@ -699,6 +713,7 @@ template <typename Parser> class combinator_except {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank = 0;
     string const name;
@@ -718,7 +733,8 @@ public:
     }
 };
 
-template <typename P, typename = typename P::is_parser_type>
+template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
+    || is_same<typename P::is_handle_type, true_type>::value>::type>
 combinator_except<P> const except(typename P::result_type const& x, P const& p) {
     return combinator_except<P>(x, p);
 }
@@ -755,25 +771,26 @@ class parser_handle {
     shared_ptr<holder_base const> p;
 
 public:
-    using is_parser_type = true_type;
+    using is_parser_type = false_type;
+    using is_handle_type = true_type;
     using result_type = Result_Type;
     string name = "<handle>";
     int const rank = 0;
 
     parser_handle() {}
 
-    template <typename P, typename = typename P::is_parser_type>
+    template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value>::type>
     parser_handle(P const &q) : p(new holder_poly<P>(q)), name(q.name) {} 
 
-    explicit parser_handle(parser_handle const &q) : p(q.p), name(q.name) {}
-
     // note: initialise name before moving q.
-    template <typename P, typename = typename P::is_parser_type>
+    template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value>::type>
     parser_handle(P &&q) : p(new holder_poly<P>(forward<P>(q))), name(q.name) {}
 
-    explicit parser_handle(parser_handle &&q) : p(move(q.p)), name(q.name) {}
+    parser_handle(parser_handle &&q) : p(move(q.p)), name(q.name) {}
 
-    template <typename P, typename = typename P::is_parser_type>
+    parser_handle(parser_handle const &q) : p(q.p), name(q.name) {}
+
+    template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value>::type>
     parser_handle& operator= (P const &q) {
         name = q.name;
         p = shared_ptr<holder_base const>(new holder_poly<P>(q));
@@ -786,7 +803,7 @@ public:
         return *this;
     }
 
-    template <typename P, typename = typename P::is_parser_type>
+    template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type,true_type>::value>::type>
     parser_handle& operator= (P &&q) {
         name = q.name;
         p = shared_ptr<holder_base const>(new holder_poly<P>(forward<P>(q)));
@@ -823,6 +840,7 @@ class parser_reference {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = Result_Type;
     int const rank = 0;
     string const name;
@@ -878,6 +896,7 @@ class parser_ref {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank = 0;
     string const name;
@@ -906,6 +925,7 @@ template <typename Parser> class combinator_discard {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = void;
     int const rank;
     string const name;
@@ -920,7 +940,8 @@ public:
     }
 };
 
-template <typename P, typename = typename P::is_parser_type>
+template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
+    || is_same<typename P::is_handle_type, true_type>::value>::type>
 combinator_discard<P> const discard(P const& p) {
     return combinator_discard<P>(p);
 }
@@ -935,6 +956,7 @@ class parser_log {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank;
     string const name;
@@ -964,7 +986,8 @@ public:
     }
 };
 
-template <typename P, typename = typename P::is_parser_type>
+template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
+    || is_same<typename P::is_handle_type, true_type>::value>::type>
 parser_log<P> log(string const& s, P const& p) {
     return parser_log<P>(s, p);
 }
@@ -978,6 +1001,7 @@ class parser_try {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank;
     string const name;
@@ -996,7 +1020,8 @@ public:
     }
 };
 
-template <typename P, typename = typename P::is_parser_type>
+template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
+    || is_same<typename P::is_handle_type, true_type>::value>::type>
 parser_try<P> attempt(P const& p) {
     return parser_try<P>(p);
 }
@@ -1011,6 +1036,7 @@ class parser_strict {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank;
     string const name;
@@ -1028,7 +1054,8 @@ public:
     }
 };
 
-template <typename P, typename = typename P::is_parser_type>
+template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
+    || is_same<typename P::is_handle_type, true_type>::value>::type>
 parser_strict<P> strict(string const& s, P const& p) {
     return parser_strict<P>(s, p);
 }
@@ -1042,6 +1069,7 @@ class parser_name {
 
 public:
     using is_parser_type = true_type;
+    using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank;
     string const name;
@@ -1055,7 +1083,8 @@ public:
     }
 };
 
-template <typename P, typename = typename P::is_parser_type>
+template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
+    || is_same<typename P::is_handle_type, true_type>::value>::type>
 parser_name<P> name(string const& s, P const& p) {
     return parser_name<P>(s, p);
 }
