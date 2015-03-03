@@ -1095,26 +1095,36 @@ parser_name<P> name(string const& s, P const& p) {
 //----------------------------------------------------------------------------
 // Optionally accept the parser once.
 
+constexpr char b_opt[] = "[";
+constexpr char e_opt[] = "]";
+
 template <typename P> auto option(P const& p)
--> decltype(name("[" + p.name + "]", p || succ)) {
-    return name("[" + p.name + "]", p || succ);
+-> decltype(name(b_opt + p.name + e_opt, p || succ)) {
+    return name(b_opt + p.name + e_opt, p || succ);
 }
 
 //----------------------------------------------------------------------------
 // Accept the parser one or more times.
 
+constexpr char b_some[] = "{";
+constexpr char e_some[] = "}-";
+
 template <typename P> auto some(P const& p)
--> decltype(name("{" + p.name + "}-", p && many(p))) {
-    return name("{" + p.name + "}-", p && many(p));
+-> decltype(name(b_some + p.name + e_some, p && many(p))) {
+    return name(b_some + p.name + e_some, p && many(p));
 }
 
 //----------------------------------------------------------------------------
 // Accept one parser separated by another
 
+constexpr char b_sep[] = "{";
+constexpr char s_sep[] = ", ";
+constexpr char e_sep[] = "}";
+
 template <typename P, typename Q> auto sep_by(P const& p, Q const& q)
--> decltype(name(p.name + "{" + q.name + ", " + p.name + "}",
+-> decltype(name(p.name + b_sep + q.name + s_sep + p.name + e_sep,
         p && many(discard(q) && p))) {
-    return name(p.name + "{" + q.name + ", " + p.name + "}",
+    return name(p.name + b_sep + q.name + s_sep + p.name + e_sep,
         p && many(discard(q) && p));
 }
 
