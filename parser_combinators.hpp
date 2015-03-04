@@ -345,11 +345,12 @@ public:
 
     explicit recogniser_accept(Predicate const& p) : p(p), name(p.name) {}
 
-    template <typename Iterator, typename Range>
+    template <typename Iterator, typename Range, typename Inherit = void>
     bool operator() (
         Iterator &i,
         Range const &r,
-        string *result = nullptr
+        string *result = nullptr,
+        Inherit* st = nullptr
     ) const {
         int sym = *i;
         if (i == r.last) {
@@ -386,11 +387,12 @@ public:
 
     explicit accept_str(string const& s) : s(s), name("\"" + s + "\"") {}
 
-    template <typename Iterator, typename Range>
+    template <typename Iterator, typename Range, typename Inherit = void>
     bool operator() (
         Iterator &i,
         Range const &r,
-        string *result = nullptr
+        string *result = nullptr,
+        Inherit* st = nullptr
     ) const {
         for (auto j = s.begin(); j != s.end(); ++j) {
             if (*i != *j || i == r.last) {
@@ -420,8 +422,13 @@ struct parser_succ {
 
     parser_succ() {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, void *result = nullptr) const {
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        void *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         return true;
     }
 } const succ;
@@ -438,8 +445,13 @@ struct parser_fail {
 
     parser_fail() {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, void *result = nullptr) const {
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        void *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         return false;
     }
 } const fail;
@@ -449,6 +461,34 @@ struct parser_fail {
 
 //----------------------------------------------------------------------------
 // as soon as one parser succeeds, pass result to user supplied functor
+
+template <typename Functor, typename Inherit, typename = void> class call_any {}; 
+
+template <typename Functor, typename Inherit>
+class call_any<Functor, Inherit, typename enable_if<is_same<Inherit, void>::value>::type> {
+    Functor const f;
+
+public: 
+    explicit call_any(Functor const& f) : f(f) {}
+    
+    template <typename Result, typename Rs, size_t... I>
+    void any(Result* r, int j, Rs& rs, Inherit* st, size_t...) {
+        f(r, j, get<I>(rs)...);
+    }
+};
+
+template <typename Functor, typename Inherit>
+class call_any<Functor, Inherit, typename enable_if<!is_same<Inherit, void>::value>::type> {
+    Functor const f;
+
+public: 
+    explicit call_any(Functor const& f) : f(f) {}
+    
+    template <typename Result, typename Rs, size_t... I>
+    void any(Result* r, int j, Rs& rs, Inherit* st, size_t...) {
+        f(r, j, get<I>(rs)..., st);
+    }
+};
 
 template <typename Functor, typename... Parsers> class fmap_choice {
     using functor_traits = function_traits<Functor>;
@@ -464,35 +504,37 @@ private:
     tuple_type const ps;
     Functor const f;
 
-    template <typename Iterator, typename Range, typename Rs, size_t I0, size_t... Is> 
-    int any_parsers(Iterator &i, Range const &r, Rs &rs, size_t, size_t...) const {
-        if (get<I0>(ps)(i, r, &get<I0>(rs))) {
+    template <typename Iterator, typename Range, typename Inherit, typename Rs, size_t I0, size_t... Is> 
+    int any_parsers(Iterator &i, Range const &r, Inherit* st, Rs &rs, size_t, size_t...) const {
+        if (get<I0>(ps)(i, r, &get<I0>(rs), st)) {
             return I0;
         }
-        return any_parsers<Iterator, Range, Rs, Is...>(i, r, rs, Is...);
+        return any_parsers<Iterator, Range, Inherit, Rs, Is...>(i, r, st, rs, Is...);
     }
 
-    template <typename Iterator, typename Range, typename Rs, size_t I0>
-    int any_parsers(Iterator &i, Range const &r, Rs &rs, size_t) const {
-        if (get<I0>(ps)(i, r, &get<I0>(rs))) {
+    template <typename Iterator, typename Range, typename Inherit, typename Rs, size_t I0>
+    int any_parsers(Iterator &i, Range const &r, Inherit* st, Rs &rs, size_t) const {
+        if (get<I0>(ps)(i, r, &get<I0>(rs), st)) {
             return I0;
         }
         return -1;
     }
 
-    template <typename Iterator, typename Range, size_t... I> bool fmap_any(
+    template <typename Iterator, typename Range, typename Inherit, size_t... I> bool fmap_any(
         Iterator &i,
         Range const &r,
         size_sequence<I...> seq,
-        result_type *result
+        result_type *result,
+        Inherit* st
     ) const {
         tmp_type tmp {};
         Iterator const first = i;
-        int const j = any_parsers<Iterator, Range, tmp_type, I...>(i, r, tmp, I...);
+        int const j = any_parsers<Iterator, Range, Inherit, tmp_type, I...>(i, r, st, tmp, I...);
         if (j >= 0) {
             if (result != nullptr) {
+                call_any<Functor, Inherit> call_f(f);
                 try {
-                    f(result, j, get<I>(tmp)...);
+                    call_f.template any<result_type, tmp_type, I...>(result, j, tmp, st, I...);
                 } catch (runtime_error &e) {
                     throw parse_error(e.what(), name, first, i, r);
                 }
@@ -509,10 +551,15 @@ public:
     explicit fmap_choice(Functor const& f, Parsers const&... ps)
         : f(f), ps(ps...), name("<" + concat(" | ", format_name(ps, rank)...) + ">") {}
 
-    template <typename Iterator, typename Range,
+    template <typename Iterator, typename Range, typename Inherit,
         typename Is = typename range<0, sizeof...(Parsers)>::type>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
-        return fmap_any(i, r, Is(), result);
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
+        return fmap_any(i, r, Is(), result, st);
     }
 };
 
@@ -523,6 +570,34 @@ fmap_choice<F, PS...> const any(F const& f, PS const&... ps) {
 
 //----------------------------------------------------------------------------
 // If all parsers succeed, pass all results as arguments to user supplied functor
+
+template <typename Functor, typename Inherit, typename = void> class call_all {}; 
+
+template <typename Functor, typename Inherit>
+class call_all<Functor, Inherit, typename enable_if<is_same<Inherit, void>::value>::type> {
+    Functor const f;
+
+public: 
+    explicit call_all(Functor const& f) : f(f) {}
+    
+    template <typename Result, typename Rs, size_t... I>
+    void all(Result* r, Rs& rs, Inherit* st, size_t...) {
+        f(r, get<I>(rs)...);
+    }
+};
+
+template <typename Functor, typename Inherit>
+class call_all<Functor, Inherit, typename enable_if<!is_same<Inherit, void>::value>::type> {
+    Functor const f;
+
+public: 
+    explicit call_all(Functor const& f) : f(f) {}
+    
+    template <typename Result, typename Rs, size_t... I>
+    void all(Result* r, Rs& rs, Inherit* st, size_t...) {
+        f(r, get<I>(rs)..., st);
+    }
+};
 
 template <typename Functor, typename... Parsers> class fmap_sequence {
     using functor_traits = function_traits<Functor>;
@@ -538,31 +613,28 @@ private:
     tuple_type const ps;
     Functor const f;
 
-    template <typename Iterator, typename Range, typename Rs, size_t I0, size_t... Is> 
-    bool all_parsers(Iterator &i, Range const &r, Rs &rs, size_t, size_t...) const {
-        if (get<I0>(ps)(i, r, &get<I0>(rs))) {
-            return all_parsers<Iterator, Range, Rs, Is...>(i, r, rs, Is...);
+    template <typename Iterator, typename Range, typename Inherit, typename Rs, size_t I0, size_t... Is> 
+    bool all_parsers(Iterator &i, Range const &r, Inherit* st, Rs &rs, size_t, size_t...) const {
+        if (get<I0>(ps)(i, r, &get<I0>(rs), st)) {
+            return all_parsers<Iterator, Range, Inherit, Rs, Is...>(i, r, st, rs, Is...);
         }
         return false;
     }
 
-    template <typename Iterator, typename Range, typename Rs, size_t I0>
-    bool all_parsers(Iterator &i, Range const &r, Rs &rs, size_t) const {
-        return get<I0>(ps)(i, r, &get<I0>(rs));
+    template <typename Iterator, typename Range, typename Inherit, typename Rs, size_t I0>
+    bool all_parsers(Iterator &i, Range const &r, Inherit* st, Rs &rs, size_t) const {
+        return get<I0>(ps)(i, r, &get<I0>(rs), st);
     }
 
-    template <typename Iterator, typename Range, size_t... I> bool fmap_all(
-        Iterator &i,
-        Range const &r,
-        size_sequence<I...> seq,
-        result_type *result
-    ) const {
+    template <typename Iterator, typename Range, typename Inherit, size_t... I>
+    bool fmap_all(Iterator &i, Range const &r, size_sequence<I...> seq, result_type *result, Inherit* st) const {
         tmp_type tmp {};
         Iterator const first = i;
-        if (all_parsers<Iterator, Range, tmp_type, I...>(i, r, tmp, I...)) {
+        if (all_parsers<Iterator, Range, Inherit, tmp_type, I...>(i, r, st, tmp, I...)) {
             if (result != nullptr) {
+                call_all<Functor, Inherit> call_f(f);
                 try {
-                    f(result, get<I>(tmp)...);
+                    call_f.template all<result_type, tmp_type, I...>(result, tmp, st, I...);
                 } catch (runtime_error &e) {
                     throw parse_error(e.what(), name, first, i, r);
                 }
@@ -579,10 +651,15 @@ public:
     explicit fmap_sequence(Functor const& f, Parsers const&... ps)
         : f(f), ps(ps...), name("<" + concat(", ", format_name(ps, rank)...) + ">") {}
 
-    template <typename Iterator, typename Range,
+    template <typename Iterator, typename Range, typename Inherit = void,
         typename Is = typename range<0, sizeof...(Parsers)>::type>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
-        return fmap_all(i, r, Is(), result);
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
+        return fmap_all(i, r, Is(), result, st);
     }
 };
 
@@ -611,16 +688,21 @@ public:
     combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2)
         , name(format_name(p1, rank) + " | " + format_name(p2, rank)) {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         Iterator const first = i;
-        if (p1(i, r, result)) {
+        if (p1(i, r, result, st)) {
             return true;
         }
         if (first != i) {
             throw parse_error("failed parser consumed input", p1.name, first, i, r);
         }
-        if (p2(i, r, result)) {
+        if (p2(i, r, result, st)) {
             return true;
         }
         return false;
@@ -654,9 +736,14 @@ public:
     combinator_sequence(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2)
         , name(format_name(p1, rank) +  ", " + format_name(p2, rank)) {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
-        return p1(i, r, result) && p2(i, r, result);
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
+        return p1(i, r, result, st) && p2(i, r, result, st);
     }
 };
 
@@ -685,10 +772,15 @@ public:
 
     explicit combinator_many(Parser const& p) : p(p), name("{" + p.name + "}") {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         Iterator first = i;
-        while (p(i, r, result)) {
+        while (p(i, r, result, st)) {
             first = i;
         }
         if (first != i) {
@@ -721,9 +813,14 @@ public:
     combinator_except(typename Parser::result_type const& x, Parser const& p)
         : p(p), x(x), name(p.name + " - \"" + x + "\"") {}
 
-    template <typename Iterator, typename Range> 
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
-        if (p(i, r, result)) {
+    template <typename Iterator, typename Range, typename Inherit = void> 
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
+        if (p(i, r, result, st)) {
             if (result != nullptr) {
                 return x != *result;
             }
@@ -746,13 +843,18 @@ combinator_except<P> const except(typename P::result_type const& x, P const& p) 
 // Handle: holds a runtime-polymorphic parser. It is mutable so that it can be
 // defined before the parser is assigned.
 
-template <typename Iterator, typename Range, typename Result_Type>
+template <typename Iterator, typename Range, typename Synthesize = void, typename Inherit = void>
 class parser_handle {
 
     struct holder_base {
         virtual ~holder_base() {}
 
-        virtual bool parse(Iterator& i, Range const &r, Result_Type *result = nullptr) const = 0;
+        virtual bool parse(
+            Iterator& i,
+            Range const &r,
+            Synthesize* result = nullptr,
+            Inherit* st = nullptr
+        ) const = 0;
     }; 
 
     template <typename Parser>
@@ -763,8 +865,13 @@ class parser_handle {
         explicit holder_poly(Parser const &q) : p(q) {}
         explicit holder_poly(Parser &&q) : p(forward<Parser>(q)) {}
 
-        virtual bool parse(Iterator &i, Range const &r, Result_Type *result) const override {
-            return p(i, r, result);
+        virtual bool parse(
+            Iterator &i,
+            Range const &r,
+            Synthesize* result = nullptr,
+            Inherit* st = nullptr
+        ) const override {
+            return p(i, r, result, st);
         }
     };
 
@@ -773,7 +880,7 @@ class parser_handle {
 public:
     using is_parser_type = false_type;
     using is_handle_type = true_type;
-    using result_type = Result_Type;
+    using result_type = Synthesize;
     string name = "<handle>";
     int const rank = 0;
 
@@ -816,9 +923,14 @@ public:
         return *this;
     }
 
-    bool operator() (Iterator &i, Range const &r, Result_Type *result = nullptr) const {
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        Synthesize* result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         assert(p != nullptr);
-        return p->parse(i, r, result);
+        return p->parse(i, r, result, st);
     }
 };
 
@@ -833,27 +945,27 @@ public:
 // possibly depricated? Might be better to use handle (above) and reference
 // (below) consistently.
 
-template <typename Iterator, typename Range, typename Result_Type>
+template <typename Iterator, typename Range, typename Synthesize = void, typename Inherit = void>
 class parser_reference {
 
-    shared_ptr<parser_handle<Iterator, Range, Result_Type>> const p;
+    shared_ptr<parser_handle<Iterator, Range, Synthesize, Inherit>> const p;
 
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
-    using result_type = Result_Type;
+    using result_type = Synthesize;
     int const rank = 0;
     string const name;
 
-    parser_reference() : p(new parser_handle<Iterator, Range, Result_Type>()), name(p.name) {}
+    parser_reference() : p(new parser_handle<Iterator, Range, Synthesize, Inherit>()), name(p.name) {}
 
     template <typename P, typename = typename P::is_parser_type>
-    parser_reference(P const &q) : p(new parser_handle<Iterator, Range, Result_Type>(q)) {}
+    parser_reference(P const &q) : p(new parser_handle<Iterator, Range, Synthesize, Inherit>(q)) {}
 
     explicit parser_reference(parser_reference const &q) : p(q.p) {}
 
     template <typename P, typename = typename P::is_parser_type>
-    parser_reference(P &&q) : p(new parser_handle<Iterator, Range, Result_Type>(forward<P>(q))) {}
+    parser_reference(P &&q) : p(new parser_handle<Iterator, Range, Synthesize, Inherit>(forward<P>(q))) {}
 
     explicit parser_reference(parser_reference &&q) : p(move(q.p)) {}
 
@@ -879,9 +991,14 @@ public:
         return *this;
     }
 
-    bool operator() (Iterator &i, Range const &r, Result_Type *result = nullptr) const {
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        Synthesize* result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         assert(p != nullptr);
-        return (*p)(i, r, result);
+        return (*p)(i, r, result, st);
     }
 };
 
@@ -903,9 +1020,9 @@ public:
 
     explicit parser_ref(string const& name, Parser const &q) : p(q), name(name) {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
-        return p(i, r, result);
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr, Inherit* st = nullptr) const {
+        return p(i, r, result, st);
     }
 };
 
@@ -933,10 +1050,15 @@ public:
     explicit combinator_discard(Parser const& q)
         : p(q), rank(q.rank), name(q.name) {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         typename Parser::result_type *const discard_result = nullptr;
-        return p(i, r, discard_result);
+        return p(i, r, discard_result, st);
     }
 };
 
@@ -964,11 +1086,16 @@ public:
     explicit parser_log(string const& s, Parser const& q)
         : p(q), msg(s), rank(q.rank), name(q.name) {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         Iterator const x = i;
 
-        bool const b = p(i, r, result);
+        bool const b = p(i, r, result, st);
 
 #ifdef DEBUG
         if (b) {
@@ -1009,10 +1136,15 @@ public:
     explicit parser_try(Parser const& q)
         : p(q), rank(q.rank), name(q.name) {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         Iterator const first = i;
-        if (p(i, r, result)) {
+        if (p(i, r, result, st)) {
             return true;
         }
         i = first;
@@ -1044,10 +1176,15 @@ public:
     parser_strict(string const& s, Parser const& q)
         : p(q), err(s), rank(q.rank), name(q.name) {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
+    template <typename Iterator, typename Range, typename Inherit = void>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
         Iterator const first = i;
-        if (!p(i, r, result)) {
+        if (!p(i, r, result, st)) {
             throw parse_error(err, p.name, first, i, r);
         }
         return true;
@@ -1077,9 +1214,14 @@ public:
     parser_name(string const& s, Parser const& q)
         : p(q), rank(q.rank), name(s) {}
 
-    template <typename Iterator, typename Range>
-    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr) const {
-        return p(i, r, result);
+    template <typename Iterator, typename Range, typename Inherit>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
+        return p(i, r, result, st);
     }
 };
 
