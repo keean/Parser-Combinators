@@ -1,7 +1,7 @@
 Parser-Combinators
 ==================
 
-<b>The latest version now supports functionality equivalent to an attribute grammar, where the parser result (synthesized attribute) is returned bottom up, and state (inherited attribute) is threaded trough the parsers accumulating values left-to-right. This needs some care to interact with backtracking, as the state needs to be backtracked as well. The 'attempt' parser combinator deals with saving the current result and state and restoring it on backtracking, but this relies on the state being copyable. If there is only single-character look-ahead failed parsers do not consume characters, and so backtracking is unnecessary, and the state does not need to by copyable.</b>
+<b>The latest version now supports functionality equivalent to an attribute grammar, where the parser result (synthesized attribute) is returned bottom up, and state (inherited attribute) is threaded trough the parsers accumulating values left-to-right. This needs some care to interact with backtracking, as the state needs to be backtracked as well. The 'attempt' parser combinator deals with saving the current result and state and restoring it on backtracking, but this relies on the state being copyable. If there is only single-character look-ahead failed parsers do not consume characters, and so backtracking is unnecessary, and the state does not need to be copyable.</b>
 
 A high performance C++ parser combinator library, focusing static instantiation of combinators, which differentiates it from other libraries such as Boost.Spirit. The library design ensures that all combinator composition occurs at compile time, with a special construct (a parser-handle) used to allow dynamic runtime polymorphism at specific points.
 
