@@ -113,7 +113,7 @@ public:
 
 #endif // USE_MMAP
 
-template <typename Synthesize = void, typename Inherit = void>
+template <typename Synthesize = void, typename Inherit = default_inherited>
 using pstream_handle = parser_handle<stream_range::iterator, stream_range, Synthesize, Inherit>;
 
 #endif // STREAM_ITERATOR_HPP
