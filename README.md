@@ -11,4 +11,4 @@ This gives the programmer control over whether polymorphism is static or dynamic
 
 The library now uses an Iterator and Range pair, and provides a stream_range that makes backtracking much neater in the implementation, results in a 25% performance improvement compared to the pre-iterator version on non-backtracking parsers, and even more (40% improvement) on backtracking parsers. The combinator parser with stream iterator is now about twice the speed of the simple recursive descent parser, and the iterator interface can be used with the File-Vector which doubles the performance again. Swapping between the stream range/iterator and the file_vector range/iterator is now controlled by defining USE_MMAP, without needing to change the source code.
 
-See "test_combinators.cpp", "example_expression.cpp", and "prolog.cpp" for usage examples.
+See "test_combinators.cpp" for a simple example, "example_expression.cpp" for backtracking with sythesized attributes, and "prolog.cpp" for inherited attribute usage examples.
