@@ -111,7 +111,7 @@ using var_t = map<string const*, type_variable*>::const_iterator;
 
 struct parser_state {
     set<string> names; // global name table
-    map<string const*, type_variable*> variables;
+    map<string const*, type_variable*> variables; 
     set<type_variable*> repeated;
     set<type_variable*> repeated_in_goal;
 
@@ -132,10 +132,8 @@ struct parser_state {
 //----------------------------------------------------------------------------
 // Grammar
 
-class return_variable {
-public:
+struct return_variable {
     return_variable() {}
-
     void operator() (type_variable** res, string const& name, parser_state* st) const {
         name_t const n = st->get_name(name);
         var_t i = st->variables.find(&(*n));
@@ -172,20 +170,20 @@ struct return_struct {
     }
 } const return_struct;
 
-struct return_goal {
-    return_goal() {}
+struct return_head {
+    return_head() {}
     void operator() (type_struct** res, type_struct* str, parser_state* st) const {
         *res = str;
         st->repeated_in_goal = st->repeated;
     }
-} const return_goal;
+} const return_head;
 
-struct return_impl {
-    return_impl() {}
+struct return_goal {
+    return_goal() {}
     void operator() (vector<type_struct*>* res, type_struct* impl, parser_state*) const {
         res->push_back(impl);
     }
-} const return_impl;
+} const return_goal;
 
 struct return_clause {
     return_clause() {}
@@ -197,8 +195,8 @@ struct return_clause {
     }
 } const return_clause;
 
-struct return_clause2 {
-    return_clause2() {}
+struct return_goals {
+    return_goals() {}
     void operator() (vector<clause*>* res, vector<type_struct*>& impl, parser_state* st) const {
         vector<type_expression*> vars;
         for (auto v : st->variables) {
@@ -212,7 +210,7 @@ struct return_clause2 {
         st->repeated.clear();
         st->repeated_in_goal.clear();
     }
-} const return_clause2;
+} const return_goals;
 
 //----------------------------------------------------------------------------
 // Parser
@@ -237,9 +235,9 @@ pstream_handle<type_struct*, parser_state> const structure(pstream_handle<type_s
 
 pstream_handle<type_struct*, parser_state> const goal = structure(reference("structure", goal));
 
-auto const clause = all(return_clause, all(return_goal, goal),
-    option(discard(impl_tok) && sep_by(all(return_impl, goal), discard(sep_tok))) && discard(end_tok))
-    || discard(impl_tok) && all(return_clause2, sep_by(all(return_impl, goal), discard(sep_tok)) && discard(end_tok))
+auto const clause = all(return_clause, all(return_head, goal),
+    option(discard(impl_tok) && sep_by(all(return_goal, goal), discard(sep_tok))) && discard(end_tok))
+    || discard(impl_tok) && all(return_goals, sep_by(all(return_goal, goal), discard(sep_tok)) && discard(end_tok))
     || discard(comment_tok);
 
 struct expression_parser;
