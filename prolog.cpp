@@ -12,9 +12,17 @@ using namespace std;
 
 //============================================================================
 // Logic Language Parser.
+//
+// A simple parser for a Prolog like language.
 
 //----------------------------------------------------------------------------
 // Syntactic Structure.
+//
+// A global set of names keeps string comparisons for atoms and varibles to
+// a single iterator (pointer) comparison. A single type is used for atoms
+// and structs, which is combined with a variable type in an expression 
+// supertype. Clauses combine heads and goals, and keep track of repeated 
+// variables in the head for efficient post-unification cycle checking.
 
 using name_t = set<string>::const_iterator;
 
@@ -106,6 +114,12 @@ ostream& operator<< (ostream& out, clause* cls) {
 
 //----------------------------------------------------------------------------
 // Parser State
+//
+// Making this uncopyable prevents backtracking being used, as the 'attempt'
+// combinator will try and make a copy of the inherited attribute for 
+// backtracking. This can be seen as a constraint on the parser (to ensure
+// performance) or a safety measure to make sure we deal with copying if we 
+// want backtracking.
 
 using var_t = map<string const*, type_variable*>::const_iterator;
 
@@ -131,6 +145,10 @@ struct parser_state {
 
 //----------------------------------------------------------------------------
 // Grammar
+//
+// Function objects get passed the results of the sub-parsers, along with the 
+// inherited attribute. As the parser-combinators are templated, the inherited
+// attribute is whatever type is passed as the final argument to the parser.
 
 struct return_variable {
     return_variable() {}
@@ -214,6 +232,10 @@ struct return_goals {
 
 //----------------------------------------------------------------------------
 // Parser
+//
+// The parsers and user grammar are all stateless, so can be const objects and 
+// still thread safe. The final composed parser is a regular proceedure, all state 
+// is either in the state object passed in, or in the returned values.
 
 using expression_handle = pstream_handle<string, parser_state>;
 
@@ -262,6 +284,9 @@ int parse(Range const &r) {
 }
 
 //----------------------------------------------------------------------------
+// The stream_range allows file iterators to be used like random_iterators
+// and abstracts the difference between C++ stdlib streams and file_vectors.
+
 
 int main(int const argc, char const *argv[]) {
     if (argc < 1) {
