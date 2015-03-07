@@ -234,7 +234,7 @@ struct return_goals {
 // Parser
 //
 // The parsers and user grammar are all stateless, so can be const objects and 
-// still thread safe. The final composed parser is a regular proceedure, all state 
+// still thread safe. The final composed parser is a regular procedure, all state 
 // is either in the state object passed in, or in the returned values.
 
 using expression_handle = pstream_handle<string, parser_state>;
