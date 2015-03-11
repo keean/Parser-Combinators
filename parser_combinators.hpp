@@ -9,6 +9,7 @@
 #include <istream>
 #include <stdexcept>
 #include <vector>
+#include <set>
 #include <tuple>
 #include <type_traits>
 #include <memory>
@@ -24,6 +25,7 @@ using namespace std;
 
 struct is_any {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "anything";
     is_any() {}
     bool operator() (int const c) const {
@@ -33,6 +35,7 @@ struct is_any {
 
 struct is_alnum {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "alphanumeric";
     is_alnum() {}
     bool operator() (int const c) const {
@@ -42,6 +45,7 @@ struct is_alnum {
 
 struct is_alpha {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "alphabetic";
     is_alpha() {}
     bool operator() (int const c) const {
@@ -51,6 +55,7 @@ struct is_alpha {
 
 struct is_blank {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "blank";
     is_blank() {}
     bool operator() (int const c) const {
@@ -60,6 +65,7 @@ struct is_blank {
 
 struct is_cntrl {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "control";
     is_cntrl() {}
     bool operator() (int const c) const {
@@ -69,6 +75,7 @@ struct is_cntrl {
 
 struct is_digit {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "digit";
     is_digit() {}
     bool operator() (int const c) const {
@@ -78,6 +85,7 @@ struct is_digit {
 
 struct is_graph {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "graph";
     is_graph() {}
     bool operator() (int const c) const {
@@ -87,6 +95,7 @@ struct is_graph {
 
 struct is_lower {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "lowercase";
     is_lower() {}
     bool operator() (int const c) const {
@@ -96,6 +105,7 @@ struct is_lower {
 
 struct is_print {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "printable";
     is_print() {}
     bool operator() (int const c) const {
@@ -105,6 +115,7 @@ struct is_print {
 
 struct is_punct {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "punctuation";
     is_punct() {}
     bool operator() (int const c) const {
@@ -114,6 +125,7 @@ struct is_punct {
 
 struct is_space {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "space";
     is_space() {}
     bool operator() (int const c) const {
@@ -123,6 +135,7 @@ struct is_space {
 
 struct is_upper {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "uppercase";
     is_upper() {}
     bool operator() (int const c) const {
@@ -132,12 +145,23 @@ struct is_upper {
 
 struct is_xdigit {
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name = "hexdigit";
     is_xdigit() {}
     bool operator() (int const c) const {
         return ::isxdigit(c) != 0;
     }
 } const is_xdigit;
+
+struct is_eol {
+    using is_predicate_type = true_type;
+    static constexpr int rank = 0;
+    string const name = "EOL";
+    is_eol() {}
+    bool operator() (int const c) const {
+        return c == '\n';
+    }
+} const is_eol;
 
 //----------------------------------------------------------------------------
 // Any single character
@@ -147,6 +171,7 @@ class is_char {
 
 public:
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name;
     explicit is_char(char const c)
         : k(c), name("'" + string(1, c) + "'") {}
@@ -160,15 +185,25 @@ is_char const is_eof(EOF);
 //----------------------------------------------------------------------------
 // Combining character predicates
 
+template <typename P,  typename = typename P::is_predicate_type>
+string format_name(P const& p, int const rank) {
+    if (p.rank > rank) {
+        return "(" + p.name + ")";
+    } else {
+        return p.name;
+    }
+}
+
 template <typename P1, typename P2> class is_either {
     P1 const p1;
     P2 const p2;
 
 public:
     using is_predicate_type = true_type;
+    static constexpr int rank = 1;
     string const name;
     is_either(P1 const& p1, P2 const& p2)
-        : p1(p1), p2(p2), name("(" + p1.name + " or " + p2.name + ")") {}
+        : p1(p1), p2(p2), name(p1.name + " | " + p2.name) {}
     bool operator() (int const c) const {
         return p1(c) || p2(c);
     }
@@ -188,9 +223,10 @@ template <typename P1> class is_not {
 
 public:
     using is_predicate_type = true_type;
+    static constexpr int rank = 0;
     string const name;
     explicit is_not(P1 const& p1) 
-        : p1(p1), name("~" + p1.name) {}
+        : p1(p1), name(" - " + format_name(p1, rank)) {}
     bool operator() (int const c) const {
         return !p1(c);
     }
@@ -210,10 +246,12 @@ struct default_inherited {};
 //===========================================================================
 // Parsing Errors
 
+using unique_defs = set<string>;
+
 struct parse_error : public runtime_error {
 
-    template <typename Iterator, typename Range>
-    static string message(string const& what, string const& pb,
+    template <typename Parser, typename Iterator, typename Range>
+    static string message(string const& what, Parser const& p,
         Iterator const &f, Iterator const &l, Range const &r
     ) {
         stringstream err;
@@ -254,15 +292,23 @@ struct parse_error : public runtime_error {
             err << "^";
         }
         
-        err << endl << pb << endl;
+        err << endl;
+       
+        unique_defs defs;
+        string name = p.ebnf(&defs);
+
+        for (auto d : defs) {
+            err << d << endl;
+        }
+        err << name << endl;
 
         return err.str();
     }
 
-    template <typename Iterator, typename Range>
-    parse_error(string const& what, string const& pb,
+    template <typename Parser, typename Iterator, typename Range>
+    parse_error(string const& what, Parser const& p,
         Iterator const &f, Iterator const &l, Range const &r
-    ) : runtime_error(message(what, pb, f, l, r)) {}
+    ) : runtime_error(message(what, p, f, l, r)) {}
 };
 
 //============================================================================
@@ -272,9 +318,27 @@ struct parse_error : public runtime_error {
 // Make tuples of integer sequences from begining to end - 1 of range
 template <size_t... Is> struct size_sequence {};
 template <size_t Begin, size_t End, size_t... Is> struct range : range<Begin, End - 1, End - 1, Is...> {};
-template <size_t Begin, size_t... Is> struct range<Begin, Begin, Is...> {
-    using type = size_sequence<Is...>;
-};
+template <size_t Begin, size_t... Is> struct range<Begin, Begin, Is...> : size_sequence<Is...> {};
+
+template <typename F, typename A, typename T, size_t I0, size_t... Is>
+A fold_tuple2(F f, A a, T&& t, size_t, size_t...) {
+    return fold_tuple2<F, A, T, Is...>(f, f(a, get<I0>(t)), t, Is...);
+}
+
+template <typename F, typename A, typename T, size_t I0>
+A fold_tuple2(F f, A a, T&& t, size_t) {
+    return f(a, get<I0>(t));
+}
+
+template <typename F, typename A, typename T, size_t... Is> 
+A fold_tuple1(F f, A a, T&& t, size_sequence<Is...>) {
+    return fold_tuple2<F, A, T, Is...>(f, a, t, Is...);
+}
+
+template <typename F, typename A, typename... Ts>
+A fold_tuple(F f, A a, tuple<Ts...> const& t) {
+    return fold_tuple1(f, a, t, range<0, sizeof...(Ts)>());
+}
 
 //----------------------------------------------------------------------------
 // Can a pointer to one type be implicitly converted into a pointer to the other.
@@ -324,11 +388,11 @@ template <typename... Strs> string concat(string const& sep, string const& str, 
 // Use EBNF precedence for parser naming.
 
 template <typename P,  typename = typename P::is_parser_type>
-string format_name(P const& p, int const rank) {
+string format_name(P const& p, int const rank, unique_defs* defs = nullptr) {
     if (p.rank > rank) {
-        return "(" + p.name + ")";
+        return "(" + p.ebnf(defs) + ")";
     } else {
-        return p.name;
+        return p.ebnf(defs);
     }
 }
 
@@ -345,10 +409,9 @@ public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
     using result_type = string;
-    int const rank = 0;
-    string const name;
+    int const rank;
 
-    explicit recogniser_accept(Predicate const& p) : p(p), name(p.name) {}
+    explicit recogniser_accept(Predicate const& p) : p(p), rank(p.rank) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
@@ -370,6 +433,10 @@ public:
         }
         return true;
     }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return p.name;
+    }
 };
 
 template <typename P, typename = typename P::is_predicate_type>
@@ -388,9 +455,8 @@ public:
     using is_handle_type = false_type;
     using result_type = string;
     int const rank = 0;
-    string const name;
 
-    explicit accept_str(string const& s) : s(s), name("\"" + s + "\"") {}
+    explicit accept_str(string const& s) : s(s) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
@@ -410,6 +476,10 @@ public:
         }
         return true;
     }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return "\"" + s + "\"";
+    }
 };
 
 //============================================================================
@@ -423,7 +493,6 @@ struct parser_succ {
     using is_handle_type = false_type;
     using result_type = void;
     int const rank = 0;
-    string const name = "succ";
 
     parser_succ() {}
 
@@ -436,6 +505,10 @@ struct parser_succ {
     ) const {
         return true;
     }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return "succ";
+    }
 } const succ;
 
 //----------------------------------------------------------------------------
@@ -446,7 +519,6 @@ struct parser_fail {
     using is_handle_type = false_type;
     using result_type = void;
     int const rank = 0;
-    string const name = "fail";
 
     parser_fail() {}
 
@@ -458,6 +530,10 @@ struct parser_fail {
         Inherit* st = nullptr
     ) const {
         return false;
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return "fail";
     }
 } const fail;
 
@@ -541,7 +617,7 @@ private:
                 try {
                     call_f.template any<result_type, tmp_type, I...>(result, j, tmp, st, I...);
                 } catch (runtime_error &e) {
-                    throw parse_error(e.what(), name, first, i, r);
+                    throw parse_error(e.what(), *this, first, i, r);
                 }
             }
             return true;
@@ -550,21 +626,38 @@ private:
     }
 
 public:
-    int const rank = 0;
-    string const name;
+    int const rank = 1;
 
     explicit fmap_choice(Functor const& f, Parsers const&... ps)
-        : f(f), ps(ps...), name("<" + concat(" | ", format_name(ps, rank)...) + ">") {}
+        : f(f), ps(ps...) {}
 
-    template <typename Iterator, typename Range, typename Inherit,
-        typename Is = typename range<0, sizeof...(Parsers)>::type>
+    template <typename Iterator, typename Range, typename Inherit>
     bool operator() (
         Iterator &i,
         Range const &r,
         result_type *result = nullptr,
         Inherit* st = nullptr
     ) const {
-        return fmap_any(i, r, Is(), result, st);
+        return fmap_any(i, r, range<0, sizeof...(Parsers)>(), result, st);
+    }
+
+    class choice_ebnf {
+        int const rank;
+        unique_defs* defs;
+
+    public:
+        choice_ebnf(int r, unique_defs* d) : rank(r), defs(d) {}
+        template <typename P>
+        string operator() (string const& s, P&& p) const {
+            if (s.length() == 0) {
+                return format_name(p, rank, defs);
+            }
+            return s + " | "  + format_name(p, rank, defs);
+        }
+    };
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return fold_tuple(choice_ebnf(rank, defs), string(), ps);
     }
 };
 
@@ -641,7 +734,7 @@ private:
                 try {
                     call_f.template all<result_type, tmp_type, I...>(result, tmp, st, I...);
                 } catch (runtime_error &e) {
-                    throw parse_error(e.what(), name, first, i, r);
+                    throw parse_error(e.what(), *this, first, i, r);
                 }
             }
             return true;
@@ -651,20 +744,41 @@ private:
 
 public:
     int const rank = 0;
-    string const name;
 
     explicit fmap_sequence(Functor const& f, Parsers const&... ps)
-        : f(f), ps(ps...), name("<" + concat(", ", format_name(ps, rank)...) + ">") {}
+        : f(f), ps(ps...) {}
 
-    template <typename Iterator, typename Range, typename Inherit = default_inherited,
-        typename Is = typename range<0, sizeof...(Parsers)>::type>
+    template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
         Iterator &i,
         Range const &r,
         result_type *result = nullptr,
         Inherit* st = nullptr
     ) const {
-        return fmap_all(i, r, Is(), result, st);
+        return fmap_all(i, r, range<0, sizeof...(Parsers)>(), result, st);
+    }
+
+    class sequence_ebnf {
+        int const rank;
+        unique_defs* defs;
+
+    public:
+        sequence_ebnf(int r, unique_defs* d) : rank(r), defs(d) {}
+        template <typename P>
+        string operator() (string const &s, P&& p) const {
+            if (s.size() == 0) {
+                return format_name(p, rank, defs);
+            }
+            return s + ", "  + format_name(p, rank, defs);
+        }
+    };
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        if (tuple_size<tuple_type>::value == 1) {
+            return format_name(get<0>(ps), rank, defs);
+        } else {
+            return fold_tuple(sequence_ebnf(rank, defs), string(), ps);
+        }
     }
 };
 
@@ -688,10 +802,8 @@ public:
     using is_handle_type = false_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
     int const rank = 1;
-    string const name;
 
-    combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2)
-        , name(format_name(p1, rank) + " | " + format_name(p2, rank)) {}
+    combinator_choice(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
@@ -705,12 +817,16 @@ public:
             return true;
         }
         if (first != i) {
-            throw parse_error("failed parser consumed input", p1.name, first, i, r);
+            throw parse_error("failed parser consumed input", p1, first, i, r);
         }
         if (p2(i, r, result, st)) {
             return true;
         }
         return false;
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return format_name(p1, rank, defs) + " | " + format_name(p2, rank, defs);
     }
 };
 
@@ -736,10 +852,8 @@ public:
     using is_handle_type = false_type;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
     int const rank = 0;
-    string const name;
 
-    combinator_sequence(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2)
-        , name(format_name(p1, rank) +  ", " + format_name(p2, rank)) {}
+    combinator_sequence(Parser1 const& p1, Parser2 const& p2) : p1(p1), p2(p2) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
@@ -749,6 +863,10 @@ public:
         Inherit* st = nullptr
     ) const {
         return p1(i, r, result, st) && p2(i, r, result, st);
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return format_name(p1, rank, defs) + ", " + format_name(p2, rank, defs);
     }
 };
 
@@ -773,9 +891,8 @@ public:
     using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank = 0;
-    string const name;
 
-    explicit combinator_many(Parser const& p) : p(p), name("{" + p.name + "}") {}
+    explicit combinator_many(Parser const& p) : p(p) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
@@ -789,9 +906,13 @@ public:
             first = i;
         }
         if (first != i) {
-            throw parse_error("failed many-parser consumed input", p.name, first, i, r);
+            throw parse_error("failed many-parser consumed input", p, first, i, r);
         }
         return true;
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return "{" + p.ebnf(defs) + "}";
     }
 };
 
@@ -813,10 +934,8 @@ public:
     using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank = 0;
-    string const name;
 
-    combinator_except(typename Parser::result_type const& x, Parser const& p)
-        : p(p), x(x), name(p.name + " - \"" + x + "\"") {}
+    combinator_except(typename Parser::result_type const& x, Parser const& p) : p(p), x(x) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited> 
     bool operator() (
@@ -825,13 +944,20 @@ public:
         result_type *result = nullptr,
         Inherit* st = nullptr
     ) const {
-        if (p(i, r, result, st)) {
-            if (result != nullptr) {
-                return x != *result;
+        result_type tmp;
+        if (p(i, r, &tmp, st)) {
+            if (x != tmp) {
+                if (result != nullptr) {
+                    *result = tmp;
+                }
+                return true;
             }
-            return true;
         }
         return false;
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return p.ebnf(defs) + " - \"" + x + "\"";
     }
 };
 
@@ -860,6 +986,8 @@ class parser_handle {
             Synthesize* result = nullptr,
             Inherit* st = nullptr
         ) const = 0;
+
+        virtual string ebnf(unique_defs* defs = nullptr) const = 0;
     }; 
 
     template <typename Parser>
@@ -878,6 +1006,10 @@ class parser_handle {
         ) const override {
             return p(i, r, result, st);
         }
+
+        virtual string ebnf(unique_defs* defs = nullptr) const override {
+            return p.ebnf(defs);
+        }
     };
 
     shared_ptr<holder_base const> p;
@@ -886,44 +1018,39 @@ public:
     using is_parser_type = false_type;
     using is_handle_type = true_type;
     using result_type = Synthesize;
-    string name = "<handle>";
     int const rank = 0;
 
     parser_handle() {}
 
     template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value>::type>
-    parser_handle(P const &q) : p(new holder_poly<P>(q)), name(q.name) {} 
+    parser_handle(P const &q) : p(new holder_poly<P>(q)) {} 
 
     // note: initialise name before moving q.
     template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value>::type>
-    parser_handle(P &&q) : p(new holder_poly<P>(forward<P>(q))), name(q.name) {}
+    parser_handle(P &&q) : p(new holder_poly<P>(forward<P>(q))) {}
 
-    parser_handle(parser_handle &&q) : p(move(q.p)), name(q.name) {}
+    parser_handle(parser_handle &&q) : p(move(q.p)) {}
 
-    parser_handle(parser_handle const &q) : p(q.p), name(q.name) {}
+    parser_handle(parser_handle const &q) : p(q.p) {}
 
     template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value>::type>
     parser_handle& operator= (P const &q) {
-        name = q.name;
         p = shared_ptr<holder_base const>(new holder_poly<P>(q));
         return *this;
     }
 
     parser_handle& operator= (parser_handle const &q) {
-        name = q.name;
         p = q.p;
         return *this;
     }
 
     template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type,true_type>::value>::type>
     parser_handle& operator= (P &&q) {
-        name = q.name;
         p = shared_ptr<holder_base const>(new holder_poly<P>(forward<P>(q)));
         return *this;
     }
 
     parser_handle& operator= (parser_handle &&q) {
-        name = q.name;
         p = move(q.p);
         return *this;
     }
@@ -937,80 +1064,14 @@ public:
         assert(p != nullptr);
         return p->parse(i, r, result, st);
     }
-};
 
-//----------------------------------------------------------------------------
-// Reference: because the handle is mutable it breaks the assumptions of the
-// static const parser combinators (which take a copy of the argument parsers).
-// As such the combinators would take a copy of the unassigned empty handle, 
-// before it gets assigned the parser. The reference provides a const container that
-// is copied by the parser combinators, so that when the handle is assigned they
-// see the change.
-
-// possibly depricated? Might be better to use handle (above) and reference
-// (below) consistently.
-
-template <typename Iterator, typename Range, typename Synthesize = void, typename Inherit = default_inherited>
-class parser_reference {
-
-    shared_ptr<parser_handle<Iterator, Range, Synthesize, Inherit>> const p;
-
-public:
-    using is_parser_type = true_type;
-    using is_handle_type = false_type;
-    using result_type = Synthesize;
-    int const rank = 0;
-    string const name;
-
-    parser_reference() : p(new parser_handle<Iterator, Range, Synthesize, Inherit>()), name(p.name) {}
-
-    template <typename P, typename = typename P::is_parser_type>
-    parser_reference(P const &q) : p(new parser_handle<Iterator, Range, Synthesize, Inherit>(q)) {}
-
-    explicit parser_reference(parser_reference const &q) : p(q.p) {}
-
-    template <typename P, typename = typename P::is_parser_type>
-    parser_reference(P &&q) : p(new parser_handle<Iterator, Range, Synthesize, Inherit>(forward<P>(q))) {}
-
-    explicit parser_reference(parser_reference &&q) : p(move(q.p)) {}
-
-    template <typename P, typename = typename P::is_parser_type>
-    parser_reference const& operator= (P const &q) const {
-        *p = q;
-        return *this;
-    }
-
-    parser_reference const& operator= (parser_reference const &q) const {
-        *p = *(q.p);
-        return *this;
-    }
-
-    template <typename P, typename = typename P::is_parser_type>
-    parser_reference const& operator= (P &&q) const {
-        *p = forward<P>(q);
-        return *this;
-    }
-
-    parser_reference const& operator= (parser_reference &&q) const {
-        *p = *(q.p);
-        return *this;
-    }
-
-    bool operator() (
-        Iterator &i,
-        Range const &r,
-        Synthesize* result = nullptr,
-        Inherit* st = nullptr
-    ) const {
-        assert(p != nullptr);
-        return (*p)(i, r, result, st);
+    string ebnf(unique_defs* defs = nullptr) const {
+        return p->ebnf(defs);
     }
 };
 
 //----------------------------------------------------------------------------
-// This is an alternative reference that still works when the self-reference is
-// on a single line definition. Ideally this would be combined with the above.
-// (this can't be used on r-values).
+// Reference Parser, used to create a self reference in a recursive parser.
 
 template <typename Parser>
 class parser_ref {
@@ -1029,11 +1090,50 @@ public:
     bool operator() (Iterator &i, Range const &r, result_type *result = nullptr, Inherit* st = nullptr) const {
         return p(i, r, result, st);
     }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return name;
+    }
 };
 
 template <typename P, typename = typename P::is_parser_type>
 parser_ref<P> reference(string const& name, P &p) {
     return parser_ref<P>(name, p);
+}
+
+//----------------------------------------------------------------------------
+// Fixed Point Parser, neater way to define simple recursive parsers.
+
+template <typename F> class parser_fix {
+    using parser_type = typename function_traits<F>::return_type;
+    parser_type const p;
+
+public:
+    using is_parser_type = true_type;
+    using is_handle_type = false_type;
+    using result_type = typename parser_type::result_type;
+    int const rank = 0;
+    string const name;
+
+    explicit parser_fix(string const& n, F f) : p(f(reference(n, p))) , name(n) {}
+
+    template <typename Iterator, typename Range, typename Inherit = default_inherited>
+    bool operator() (Iterator &i, Range const &r, result_type *result = nullptr, Inherit* st = nullptr) const {
+        return p(i, r, result, st);
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        string const n = p.ebnf(defs);
+        if (defs != nullptr) {
+            defs->emplace(name + " = " + n + ";");
+        }
+        return name;
+    }
+};
+
+template <typename F> // , typename = typename function_traits<F>::result_type::is_parser_type>
+parser_fix<F> fix(string const& n, F f) {
+    return parser_fix<F>{n, f};
 }
 
 //============================================================================
@@ -1050,10 +1150,9 @@ public:
     using is_handle_type = false_type;
     using result_type = void;
     int const rank;
-    string const name;
 
     explicit combinator_discard(Parser const& q)
-        : p(q), rank(q.rank), name(q.name) {}
+        : p(q), rank(q.rank) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
@@ -1064,6 +1163,10 @@ public:
     ) const {
         typename Parser::result_type *const discard_result = nullptr;
         return p(i, r, discard_result, st);
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return p.ebnf(defs);
     }
 };
 
@@ -1086,10 +1189,9 @@ public:
     using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank;
-    string const name;
 
     explicit parser_log(string const& s, Parser const& q)
-        : p(q), msg(s), rank(q.rank), name(q.name) {}
+        : p(q), msg(s), rank(q.rank) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
@@ -1116,6 +1218,10 @@ public:
 
         return b;
     }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return p.ebnf(defs);
+    }
 };
 
 template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
@@ -1136,10 +1242,8 @@ public:
     using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank;
-    string const name;
 
-    explicit parser_try(Parser const& q)
-        : p(q), rank(q.rank), name(q.name) {}
+    explicit parser_try(Parser const& q) : p(q), rank(q.rank) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
@@ -1169,6 +1273,10 @@ public:
         }
         return false;
     }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return p.ebnf(defs);
+    }
 };
 
 template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
@@ -1190,10 +1298,8 @@ public:
     using is_handle_type = false_type;
     using result_type = typename Parser::result_type;
     int const rank;
-    string const name;
 
-    parser_strict(string const& s, Parser const& q)
-        : p(q), err(s), rank(q.rank), name(q.name) {}
+    parser_strict(string const& s, Parser const& q) : p(q), err(s), rank(q.rank) {}
 
     template <typename Iterator, typename Range, typename Inherit = default_inherited>
     bool operator() (
@@ -1204,9 +1310,13 @@ public:
     ) const {
         Iterator const first = i;
         if (!p(i, r, result, st)) {
-            throw parse_error(err, p.name, first, i, r);
+            throw parse_error(err, p, first, i, r);
         }
         return true;
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return p.ebnf(defs);
     }
 };
 
@@ -1230,8 +1340,8 @@ public:
     int const rank;
     string const name;
 
-    parser_name(string const& s, Parser const& q)
-        : p(q), rank(q.rank), name(s) {}
+    parser_name(string const& s, int r, Parser const& q)
+        : p(q), rank(r), name(s) {}
 
     template <typename Iterator, typename Range, typename Inherit>
     bool operator() (
@@ -1242,12 +1352,59 @@ public:
     ) const {
         return p(i, r, result, st);
     }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        p.ebnf(defs);
+        return name;
+    }
 };
 
 template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
     || is_same<typename P::is_handle_type, true_type>::value>::type>
-parser_name<P> name(string const& s, P const& p) {
-    return parser_name<P>(s, p);
+parser_name<P> rename(string const& s, int r, P const& p) {
+    return parser_name<P>(s, r, p);
+}
+
+//----------------------------------------------------------------------------
+// Define a sub-parser (for better error readability)
+
+template <typename Parser>
+class parser_def {
+    Parser const p;
+
+public:
+    using is_parser_type = true_type;
+    using is_handle_type = false_type;
+    using result_type = typename Parser::result_type;
+    int const rank;
+    string const name;
+
+    parser_def(string const& n, Parser const& q)
+        : p(q), rank(q.rank), name(n) {}
+
+    template <typename Iterator, typename Range, typename Inherit>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
+        return p(i, r, result, st);
+    }
+    
+    string ebnf(unique_defs* defs = nullptr) const {
+        string const n = p.ebnf(defs);
+        if (defs != nullptr) {
+            defs->emplace(name + " = " + n + ";");
+        }
+        return name;
+    }
+};
+
+template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
+    || is_same<typename P::is_handle_type, true_type>::value>::type>
+parser_def<P> define(string const& s, P const& p) {
+    return parser_def<P>(s, p);
 }
 
 //============================================================================
@@ -1260,8 +1417,8 @@ constexpr char b_opt[] = "[";
 constexpr char e_opt[] = "]";
 
 template <typename P> auto option(P const& p)
--> decltype(name(b_opt + p.name + e_opt, p || succ)) {
-    return name(b_opt + p.name + e_opt, p || succ);
+-> decltype(rename(b_opt + p.ebnf() + e_opt, 0, p || succ)) {
+    return rename(b_opt + p.ebnf() + e_opt, 0, p || succ);
 }
 
 //----------------------------------------------------------------------------
@@ -1271,8 +1428,8 @@ constexpr char b_some[] = "{";
 constexpr char e_some[] = "}-";
 
 template <typename P> auto some(P const& p)
--> decltype(name(b_some + p.name + e_some, p && many(p))) {
-    return name(b_some + p.name + e_some, p && many(p));
+-> decltype(rename(b_some + p.ebnf() + e_some, 0, p && many(p))) {
+    return rename(b_some + p.ebnf() + e_some, 0, p && many(p));
 }
 
 //----------------------------------------------------------------------------
@@ -1283,9 +1440,9 @@ constexpr char s_sep[] = ", ";
 constexpr char e_sep[] = "}";
 
 template <typename P, typename Q> auto sep_by(P const& p, Q const& q)
--> decltype(name(p.name + b_sep + q.name + s_sep + p.name + e_sep,
+-> decltype(rename(p.ebnf() + s_sep + b_sep + q.ebnf() + s_sep + p.ebnf() + e_sep, 0,
         p && many(discard(q) && p))) {
-    return name(p.name + b_sep + q.name + s_sep + p.name + e_sep,
+    return rename(p.ebnf() + s_sep + b_sep + q.ebnf() + s_sep + p.ebnf() + e_sep, 0,
         p && many(discard(q) && p));
 }
 
@@ -1300,8 +1457,8 @@ template <typename P, typename Q> auto sep_by(P const& p, Q const& q)
 auto first_token = discard(many(accept(is_space)));
 
 template <typename R> auto tokenise (R const& r)
--> decltype(name(r.name, r && first_token)) {
-    return name(r.name, r && first_token);
+-> decltype(rename(r.ebnf(), 0, r && first_token)) {
+    return rename(r.ebnf(), 0, r && first_token);
 }
 
 #endif // PARSER_COMBINATORS_HPP
