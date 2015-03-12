@@ -292,15 +292,14 @@ struct parse_error : public runtime_error {
             err << "^";
         }
         
-        err << endl;
+        err << endl << "expecting: ";
        
         unique_defs defs;
-        string name = p.ebnf(&defs);
+        err << p.ebnf(&defs) << endl << "where:" << endl;
 
-        for (auto d : defs) {
-            err << d << endl;
+        for (auto const& d : defs) {
+            err << "\t" << d << endl;
         }
-        err << name << endl;
 
         return err.str();
     }
