@@ -259,7 +259,7 @@ struct parse_error : public runtime_error {
         Iterator i(r.first);
         Iterator line_start(r.first);
         int row = 1;
-        while ((i != f) && (i != r.last)) {
+        while ((i != r.last) && (i != f)) {
             if (*i == '\n') {
                 ++row;
                 line_start = ++i;
@@ -271,7 +271,7 @@ struct parse_error : public runtime_error {
         err << what << " at line: " << row
             << " column: " << f - line_start + 1 << endl;
 
-        for (Iterator i(line_start); (*i != '\n') && (i != r.last); ++i) {
+        for (Iterator i(line_start); (i != r.last) && (*i != '\n'); ++i) {
             err << static_cast<char>(*i);
         }
         err << endl;
@@ -419,9 +419,11 @@ public:
         string *result = nullptr,
         Inherit* st = nullptr
     ) const {
-        int sym = *i;
+        int sym;
         if (i == r.last) {
             sym = EOF;
+        } else {
+            sym = *i;
         }
         if (!p(sym)) {
             return false;
@@ -465,7 +467,7 @@ public:
         Inherit* st = nullptr
     ) const {
         for (auto j = s.begin(); j != s.end(); ++j) {
-            if (*i != *j || i == r.last) {
+            if (i == r.last || *i != *j) {
                 return false;
             }
             ++i;
