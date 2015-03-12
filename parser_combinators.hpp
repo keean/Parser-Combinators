@@ -9,7 +9,7 @@
 #include <istream>
 #include <stdexcept>
 #include <vector>
-#include <set>
+#include <map>
 #include <tuple>
 #include <type_traits>
 #include <memory>
@@ -246,7 +246,7 @@ struct default_inherited {};
 //===========================================================================
 // Parsing Errors
 
-using unique_defs = set<string>;
+using unique_defs = map<string, string>;
 
 struct parse_error : public runtime_error {
 
@@ -298,7 +298,7 @@ struct parse_error : public runtime_error {
         err << p.ebnf(&defs) << endl << "where:" << endl;
 
         for (auto const& d : defs) {
-            err << "\t" << d << endl;
+            err << "\t" << d.first << " = " << d.second << ";" << endl;
         }
 
         return err.str();
@@ -1091,6 +1091,14 @@ public:
     }
 
     string ebnf(unique_defs* defs = nullptr) const {
+        if (defs != nullptr) {
+            auto i = defs->find(name);
+            if (i == defs->end()) {
+                auto i = (defs->emplace(name, name)).first;
+                string const n = p.ebnf(defs);
+                i->second = n;
+            }
+        }
         return name;
     }
 };
@@ -1124,7 +1132,7 @@ public:
     string ebnf(unique_defs* defs = nullptr) const {
         string const n = p.ebnf(defs);
         if (defs != nullptr) {
-            defs->emplace(name + " = " + n + ";");
+            defs->emplace(name, n);
         }
         return name;
     }
@@ -1394,7 +1402,7 @@ public:
     string ebnf(unique_defs* defs = nullptr) const {
         string const n = p.ebnf(defs);
         if (defs != nullptr) {
-            defs->emplace(name + " = " + n + ";");
+            defs->emplace(name, n);
         }
         return name;
     }
