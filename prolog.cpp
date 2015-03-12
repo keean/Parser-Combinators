@@ -266,19 +266,18 @@ auto const goals = define("goals", discard(impl_tok)
 auto const query = define("query", all(return_goals, goals) && discard(end_tok));
 auto const clause = define("clause", all(return_clause, all(return_head, structure), option(goals) && discard(end_tok)));
 
-auto const program = strict("unexpected character", some(clause || query || comment));
+auto const program = first_token && strict("unexpected character", some(clause || query || comment));
 
 struct expression_parser;
 
 template <typename Range>
 int parse(Range const &r) {
-    auto const parser = first_token && program;
-    decltype(parser)::result_type a {}; 
+    decltype(program)::result_type a {}; 
     typename Range::iterator i = r.first;
     parser_state st;
 
     profile<expression_parser> p;
-    if (parser(i, r, &a, &st)) {
+    if (program(i, r, &a, &st)) {
         cout << "OK" << endl;
     } else {
         cout << "FAIL" << endl;
