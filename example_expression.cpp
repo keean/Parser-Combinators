@@ -58,28 +58,32 @@ auto const div_tok = tokenise(accept(is_char('/')));
 
 using expression_handle = pstream_handle<int>;
 
+auto const number = define("number", all(return_int, number_tok));
+
 expression_handle const additive_expr(expression_handle e) {
-    return log("+", attempt(all(return_add, e, add_tok, e)))
-        || log("-", all(return_sub, e, sub_tok, e));
+    return define("additive", log("+", attempt(all(return_add, e, add_tok, e)))
+        || log("-", all(return_sub, e, sub_tok, e)));
 }
 
 expression_handle const multiplicative_expr(expression_handle e) {
-    return log("*", attempt(all(return_mul, e, mul_tok, e)))
-        || log("/", all(return_div, e, div_tok, e));
+    return define("multiplicative", log("*", attempt(all(return_mul, e, mul_tok, e)))
+        || log("/", all(return_div, e, div_tok, e)));
 }
 
-expression_handle const expression = strict("invalid subexpression", attempt(
-        discard(start_tok)
-        && (attempt(additive_expr(reference("expr", expression)))
-            || multiplicative_expr(reference("expr", expression)))
-        && discard(end_tok))
-    || all(return_int, number_tok));
+expression_handle recursive_expression(expression_handle expr) {
+    return attempt(discard(start_tok) && (
+            attempt(additive_expr(expr)) || multiplicative_expr(expr))
+            && discard(end_tok))
+        || number;
+}
+
+auto const expression = fix("expr", recursive_expression);
+auto const parser = first_token && strict("invalid expression", expression);
 
 struct expression_parser;
 
 template <typename Range>
 int parse(Range const &r) {
-    auto const parser = first_token && expression;
     decltype(parser)::result_type a {}; 
     typename Range::iterator i = r.first;
 
