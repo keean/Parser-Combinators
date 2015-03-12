@@ -237,36 +237,42 @@ struct return_goals {
 // still thread safe. The final composed parser is a regular procedure, all state 
 // is either in the state object passed in, or in the returned values.
 
-using expression_handle = pstream_handle<string, parser_state>;
-
-auto const atom_tok = tokenise(some(accept(is_lower)) && many(accept(is_alnum || is_char('_'))));
-auto const var_tok = tokenise(some(accept(is_upper || is_char('_'))) && many(accept(is_alnum)));
+auto const atom_tok = tokenise(accept(is_lower) && many(accept(is_alnum || is_char('_'))));
+auto const var_tok = tokenise(accept(is_upper || is_char('_')) && many(accept(is_alnum || is_char('_'))));
 auto const open_tok = tokenise(accept(is_char('(')));
 auto const close_tok = tokenise(accept(is_char(')')));
 auto const sep_tok = tokenise(accept(is_char(',')));
 auto const impl_tok = tokenise(accept_str(":-"));
 auto const end_tok = tokenise(accept(is_char('.')));
-auto const comment_tok = tokenise(accept(is_char('#')) && many(accept(is_print)) && accept(is_char('\n')));
+auto const comment_tok = tokenise(accept(is_char('#')) && many(accept(is_print)) && accept(is_eol));
 
-pstream_handle<type_struct*, parser_state> const structure(pstream_handle<type_struct*, parser_state> const s) {
-    return all(return_struct, atom_tok,
-        option(discard(open_tok)
-        && sep_by(any(return_args, all(return_variable, var_tok), s), discard(sep_tok))
+// the "definitions" help clean up the EBNF output in error reports
+auto const variable = define("variable", all(return_variable, var_tok));
+auto const atom = define("atom", atom_tok);
+
+// a function from a parser to a parser.
+pstream_handle<type_struct*, parser_state> recursive_structure(pstream_handle<type_struct*, parser_state> const s) {
+    return all(return_struct, atom, option(discard(open_tok)
+        && sep_by(any(return_args, variable, s), discard(sep_tok))
         && discard(close_tok)));
 }
 
-pstream_handle<type_struct*, parser_state> const goal = structure(reference("structure", goal));
+// tie the recursive knot.
+auto const structure = fix("struct", recursive_structure);
 
-auto const clause = all(return_clause, all(return_head, goal),
-    option(discard(impl_tok) && sep_by(all(return_goal, goal), discard(sep_tok))) && discard(end_tok))
-    || discard(impl_tok) && all(return_goals, sep_by(all(return_goal, goal), discard(sep_tok)) && discard(end_tok))
-    || discard(comment_tok);
+auto const comment = define("comment", discard(comment_tok));
+auto const goals = define("goals", discard(impl_tok)
+    && sep_by(all(return_goal, structure), discard(sep_tok)));
+auto const query = define("query", all(return_goals, goals) && discard(end_tok));
+auto const clause = define("clause", all(return_clause, all(return_head, structure), option(goals) && discard(end_tok)));
+
+auto const program = strict("unexpected character", some(clause || query || comment));
 
 struct expression_parser;
 
 template <typename Range>
 int parse(Range const &r) {
-    auto const parser = first_token && some(clause);
+    auto const parser = first_token && program;
     decltype(parser)::result_type a {}; 
     typename Range::iterator i = r.first;
     parser_state st;
