@@ -71,10 +71,9 @@ expression_handle const multiplicative_expr(expression_handle e) {
 }
 
 expression_handle recursive_expression(expression_handle expr) {
-    return attempt(discard(start_tok) && (
+    return attempt(number) || discard(start_tok) && (
             attempt(additive_expr(expr)) || multiplicative_expr(expr))
-            && discard(end_tok))
-        || number;
+            && discard(end_tok);
 }
 
 auto const expression = fix("expr", recursive_expression);
