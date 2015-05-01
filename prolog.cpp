@@ -71,10 +71,6 @@ struct type_struct : public type_expression {
     }
 };
 
-using test = enable_if<is_compatible<type_expression, type_struct>::value, bool>::type;
-
-test a;
-
 ostream& operator<< (ostream& out, type_expression* exp) {
     exp->operator<<(out);
     return out;
@@ -136,15 +132,15 @@ ostream& operator<< (ostream& out, clause* cls) {
 
 using var_t = map<string const*, type_variable*>::const_iterator;
 
-struct parser_state {
+struct program {
     set<string> names; // global name table
     map<string const*, type_variable*> variables; 
     set<type_variable*> repeated;
     set<type_variable*> repeated_in_goal;
 
-    parser_state() {};
-    parser_state(parser_state const&) = delete;
-    parser_state& operator= (parser_state const&) = delete;
+    program() {};
+    program(program const&) = delete;
+    program& operator= (program const&) = delete;
 
     name_t get_name(string const& name) {
         name_t const n = names.find(name);
@@ -165,7 +161,7 @@ struct parser_state {
 
 struct return_variable {
     return_variable() {}
-    void operator() (type_variable** res, string const& name, parser_state* st) const {
+    void operator() (type_variable** res, string const& name, program* st) const {
         name_t const n = st->get_name(name);
         var_t i = st->variables.find(&(*n));
         if (i == st->variables.end()) {
@@ -181,14 +177,14 @@ struct return_variable {
 
 struct return_args {
     return_args() {}
-    void operator() (vector<type_expression*>* res, type_expression* t1, parser_state*) const {
+    void operator() (vector<type_expression*>* res, type_expression* t1, program*) const {
         res->push_back(t1);
     }
 } const return_args;
 
 struct return_struct {
     return_struct() {}
-    void operator() (type_struct** res, string const& name, vector<type_expression*>& args, parser_state* st) const {
+    void operator() (type_struct** res, string const& name, vector<type_expression*>& args, program* st) const {
         name_t n = st->get_name(name);
         *res = new type_struct(n, args);
     }
@@ -196,7 +192,7 @@ struct return_struct {
 
 struct return_term {
     return_term() {}
-    void operator() (type_expression** res, int n, type_variable* v, type_struct *s, parser_state *st) const {
+    void operator() (type_expression** res, int n, type_variable* v, type_struct *s, program* st) const {
         switch (n) {
             case 0:
                 *res = v;
@@ -210,7 +206,7 @@ struct return_term {
 
 struct return_oper {
     return_oper() {}
-    void operator() (type_expression** res, type_expression* t1, pair<string, type_expression*> const& t2, parser_state* st) const {
+    void operator() (type_expression** res, type_expression* t1, pair<string, type_expression*> const& t2, program* st) const {
         if (!t2.first.empty()) {
             name_t o = st->get_name(t2.first);
             vector<type_expression*> a {t1, t2.second};
@@ -223,7 +219,7 @@ struct return_oper {
 
 struct return_var_op {
     return_var_op() {}
-    void operator() (type_struct** res, type_variable* t1, string const& oper, type_expression* t2, parser_state* st) const {
+    void operator() (type_struct** res, type_variable* t1, string const& oper, type_expression* t2, program* st) const {
         name_t o = st->get_name(oper);
         vector<type_expression*> a {t1, t2};
         *res = new type_struct(o, a);
@@ -236,7 +232,7 @@ struct return_oper_term {
         pair<string, type_expression*>* res,
         string const& oper,
         type_expression* term,
-        parser_state* st
+        program* st
     ) const {
         *res = make_pair(oper, term);
     }
@@ -244,7 +240,7 @@ struct return_oper_term {
 
 struct return_st_op {
     return_st_op() {}
-    void operator() (type_struct** res, type_struct* t1, pair<string, type_expression*> const& t2, parser_state* st) const {
+    void operator() (type_struct** res, type_struct* t1, pair<string, type_expression*> const& t2, program* st) const {
         if (!t2.first.empty()) {
             name_t o = st->get_name(t2.first);
             vector<type_expression*> a {t1, t2.second};
@@ -257,7 +253,7 @@ struct return_st_op {
  
 struct return_head {
     return_head() {}
-    void operator() (type_struct** res, type_struct* str, parser_state* st) const {
+    void operator() (type_struct** res, type_struct* str, program* st) const {
         *res = str;
         st->repeated_in_goal = st->repeated;
     }
@@ -265,14 +261,14 @@ struct return_head {
 
 struct return_goal {
     return_goal() {}
-    void operator() (vector<type_struct*>* res, type_struct* impl, parser_state*) const {
+    void operator() (vector<type_struct*>* res, type_struct* impl, program*) const {
         res->push_back(impl);
     }
 } const return_goal;
 
 struct return_clause {
     return_clause() {}
-    void operator() (vector<clause*>* res, type_struct* head, vector<type_struct*>& impl, parser_state* st) const {
+    void operator() (vector<clause*>* res, type_struct* head, vector<type_struct*>& impl, program* st) const {
         res->push_back(new clause(head, impl, st->repeated_in_goal));
         st->variables.clear();
         st->repeated.clear();
@@ -282,7 +278,7 @@ struct return_clause {
 
 struct return_goals {
     return_goals() {}
-    void operator() (vector<clause*>* res, vector<type_struct*>& impl, parser_state* st) const {
+    void operator() (vector<clause*>* res, vector<type_struct*>& impl, program* st) const {
         vector<type_expression*> vars;
         for (auto v : st->variables) {
             vars.push_back(v.second);
@@ -321,7 +317,7 @@ auto const variable = define("variable", all(return_variable, var_tok));
 auto const atom = define("atom", atom_tok);
 auto const oper = define("operator", oper_tok);
 
-template <typename T> using pshand = pstream_handle<T, parser_state>;
+template <typename T> using pshand = pstream_handle<T, program>;
 
 // higher order parsers.
 
@@ -360,18 +356,18 @@ auto const goals = define("goals", discard(impl_tok)
 auto const query = define("query", all(return_goals, goals) && discard(end_tok));
 auto const clause = define("clause", all(return_clause, all(return_head, structure), option(goals) && discard(end_tok)));
 
-auto const program = first_token && strict("unexpected character", some(clause || query || comment));
+auto const parser = first_token && strict("unexpected character", some(clause || query || comment));
 
 struct expression_parser;
 
 template <typename Range>
 int parse(Range const &r) {
-    decltype(program)::result_type a {}; 
+    decltype(parser)::result_type a {}; 
     typename Range::iterator i = r.first;
-    parser_state st;
+    program st;
 
     profile<expression_parser> p;
-    if (program(i, r, &a, &st)) {
+    if (parser(i, r, &a, &st)) {
         cout << "OK" << endl;
     } else {
         cout << "FAIL" << endl;
