@@ -49,17 +49,23 @@ struct type_struct : public type_expression {
     type_struct(name_t n, As&& as) : name(n), args(forward<As>(as)) {}
 
     ostream& operator<< (ostream& out) const override {
-        out << *name;
-        if (args.size() > 0) {
-            out << "(";
-            for (auto i = args.cbegin(); i != args.cend(); ++i) {
-                (*i)->operator<<(out);
-                auto j = i;
-                if (++j != args.end()) {
-                    out << ", ";
+        if (::ispunct((*name)[0]) && args.size() == 2) {
+            args[0]->operator<<(out);
+            cout << " " << *name << " ";
+            args[1]->operator<<(out);
+        } else {
+            out << *name;
+            if (args.size() > 0) {
+                out << "(";
+                for (auto i = args.cbegin(); i != args.cend(); ++i) {
+                    (*i)->operator<<(out);
+                    auto j = i;
+                    if (++j != args.end()) {
+                        out << ", ";
+                    }
                 }
+                out << ")";
             }
-            out << ")";
         }
         return out;
     }
