@@ -16,6 +16,7 @@
 #include <cassert>
 #include <iterator>
 #include <utility>
+#include <type_traits>
 #include "function_traits.hpp"
 
 using namespace std;
@@ -216,26 +217,28 @@ is_either<P1, P2> const operator|| (P1 const& p1, P2 const& p2) {
     return is_either<P1, P2>(p1, p2);
 }
 
-//----------------------------------------------------------------------------
 
-template <typename P1> class is_not {
+
+template <typename P1, typename P2> class is_except {
     P1 const p1;
+    P2 const p2;
 
 public:
     using is_predicate_type = true_type;
     static constexpr int rank = 0;
     string const name;
-    explicit is_not(P1 const& p1) 
-        : p1(p1), name(" - " + format_name(p1, rank)) {}
+    explicit is_except(P1 const& p1, P2 const& p2) 
+        : p1(p1), p2(p2), name(format_name(p1, rank) + " - " + format_name(p2, rank)) {}
     bool operator() (int const c) const {
-        return !p1(c);
+        return p1(c) && !p2(c);
     }
 };
 
-template <typename P1,
-    typename = typename P1::is_predicate_type>
-is_not<P1> const operator~ (P1 const& p1) {
-    return is_not<P1>(p1);
+template <typename P1, typename P2,
+    typename = typename P1::is_predicate_type,
+    typename = typename P2::is_predicate_type>
+is_except<P1, P2> const operator- (P1 const& p1, P2 const& p2) {
+    return is_except<P1, P2>(p1, p2);
 }
 
 //===========================================================================
@@ -271,8 +274,17 @@ struct parse_error : public runtime_error {
         err << what << " at line: " << row
             << " column: " << f - line_start + 1 << endl;
 
-        for (Iterator i(line_start); (i != r.last) && (*i != '\n'); ++i) {
-            err << static_cast<char>(*i);
+        //for (Iterator i(line_start); (i != r.last) && (*i != '\n'); ++i) {
+        bool in = true;
+        for (Iterator i(line_start); (i != r.last) && (in || *i != '\n'); ++i) {
+            if (i == l) {
+                in = false;
+            }
+            if (is_space(*i)) {
+                err << ' ';
+            } else {
+                err << static_cast<char>(*i);
+            }
         }
         err << endl;
 
@@ -281,7 +293,9 @@ struct parse_error : public runtime_error {
             err << ' ';
             ++i;
         }
+
         err << '^';
+        ++i;
 
         if (i != l) {
             ++i;
@@ -341,12 +355,15 @@ A fold_tuple(F f, A a, tuple<Ts...> const& t) {
 
 //----------------------------------------------------------------------------
 // Can a pointer to one type be implicitly converted into a pointer to the other.
+
+template <typename A, typename B> struct is_compat {
+    using PA = typename add_pointer<A>::type;
+    using PB = typename add_pointer<B>::type;
+    static constexpr bool value = is_convertible<PA, PB>::value;
+};
+
 template <typename A, typename B> struct is_compatible {
-    static constexpr bool value = is_convertible<
-            typename add_pointer<A>::type, typename add_pointer<B>::type
-        >::value || is_convertible<
-            typename add_pointer<B>::type, typename add_pointer<A>::type
-        >::value;
+    static constexpr bool value = is_compat<A, B>::value || is_compat<B, A>::value;
 };
 
 //----------------------------------------------------------------------------
@@ -356,17 +373,15 @@ template <typename A, typename B> struct is_compatible {
 // to (int*). If there is no possible implicit converstion result_type is undefined.
 template <typename P1, typename P2, typename = void> struct least_general {};
 
-template <typename P1, typename P2> struct least_general <P1, P2, typename enable_if<is_convertible<
-    typename add_pointer<typename P2::result_type>::type, 
-    typename add_pointer<typename P1::result_type>::type
->::value && !is_same<typename P1::result_type, typename P2::result_type>::value>::type> {
+template <typename P1, typename P2> struct least_general <P1, P2,
+    typename enable_if<is_compat<typename P2::result_type, typename P1::result_type>::value 
+    && !is_same<typename P1::result_type, typename P2::result_type>::value>::type> {
     using result_type = typename P2::result_type;
 };
 
-template <typename P1, typename P2> struct least_general <P1, P2, typename enable_if<is_convertible<
-    typename add_pointer<typename P1::result_type>::type, 
-    typename add_pointer<typename P2::result_type>::type
->::value || is_same<typename P1::result_type, typename P2::result_type>::value>::type> {
+template <typename P1, typename P2> struct least_general <P1, P2,
+    typename enable_if<is_compat<typename P1::result_type, typename P2::result_type>::value
+    || is_same<typename P1::result_type, typename P2::result_type>::value>::type> {
     using result_type = typename P1::result_type;
 };
 
@@ -407,6 +422,7 @@ template <typename Predicate> class recogniser_accept {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = false_type;
     using result_type = string;
     int const rank;
 
@@ -454,6 +470,7 @@ class accept_str {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = false_type;
     using result_type = string;
     int const rank = 0;
 
@@ -492,6 +509,7 @@ public:
 struct parser_succ {
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = false_type;
     using result_type = void;
     int const rank = 0;
 
@@ -518,6 +536,7 @@ struct parser_succ {
 struct parser_fail {
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = false_type;
     using result_type = void;
     int const rank = 0;
 
@@ -580,6 +599,7 @@ template <typename Functor, typename... Parsers> class fmap_choice {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = true_type;
     using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
 
 private:
@@ -706,6 +726,7 @@ template <typename Functor, typename... Parsers> class fmap_sequence {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = true_type;
     using result_type = typename remove_pointer<typename functor_traits::template argument<0>::type>::type;
 
 private:
@@ -801,6 +822,8 @@ template <typename Parser1, typename Parser2> class combinator_choice {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects =
+        integral_constant<bool, Parser1::has_side_effects::value || Parser2::has_side_effects::value>;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
     int const rank = 1;
 
@@ -836,7 +859,7 @@ template <typename P1, typename P2,
         || is_same<typename P1::is_handle_type, true_type>::value>::type,
     typename = typename enable_if<is_same<typename P2::is_parser_type, true_type>::value
         || is_same<typename P2::is_handle_type, true_type>::value>::type,
-    typename = typename enable_if<is_compatible<typename P1::result_type, typename P2::result_type>::value>::type>
+    typename = typename enable_if<is_compatible<typename P1::result_type, typename P2::result_type>::value, pair<typename P1::result_type, typename P2::result_type>>::type>
 combinator_choice<P1, P2> const operator|| (P1 const& p1, P2 const& p2) {
     return combinator_choice<P1, P2>(p1, p2);
 }
@@ -851,6 +874,8 @@ template <typename Parser1, typename Parser2> class combinator_sequence {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects =
+        integral_constant<bool, Parser1::has_side_effects::value || Parser2::has_side_effects::value>;
     using result_type = typename least_general<Parser1, Parser2>::result_type;
     int const rank = 0;
 
@@ -890,6 +915,7 @@ template <typename Parser> class combinator_many {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
     using result_type = typename Parser::result_type;
     int const rank = 0;
 
@@ -926,6 +952,7 @@ combinator_many<P> const many(P const& p) {
 //----------------------------------------------------------------------------
 // Exception parser
 
+// use when Parser p does not modify inherited attributes.
 template <typename Parser> class combinator_except {
     Parser const p;
     typename Parser::result_type const x;
@@ -933,6 +960,7 @@ template <typename Parser> class combinator_except {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
     using result_type = typename Parser::result_type;
     int const rank = 0;
 
@@ -945,6 +973,7 @@ public:
         result_type *result = nullptr,
         Inherit* st = nullptr
     ) const {
+        Iterator first = i;
         result_type tmp;
         if (p(i, r, &tmp, st)) {
             if (x != tmp) {
@@ -954,6 +983,7 @@ public:
                 return true;
             }
         }
+        i = first;
         return false;
     }
 
@@ -962,10 +992,66 @@ public:
     }
 };
 
-template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
-    || is_same<typename P::is_handle_type, true_type>::value>::type>
-combinator_except<P> const except(typename P::result_type const& x, P const& p) {
+// use when Parser p modifies inherited attributes.
+template <typename Parser> class combinator_except_side {
+    Parser const p;
+    typename Parser::result_type const x;
+
+public:
+    using is_parser_type = true_type;
+    using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
+    using result_type = typename Parser::result_type;
+    int const rank = 0;
+
+    combinator_except_side(typename Parser::result_type const& x, Parser const& p) : p(p), x(x) {}
+
+    template <typename Iterator, typename Range, typename Inherit = default_inherited> 
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
+        Iterator first = i;
+        Inherit const st1 = *st;
+        result_type tmp;
+        if (p(i, r, &tmp, st)) {
+            if (x != tmp) {
+                if (result != nullptr) {
+                    *result = tmp;
+                }
+                return true;
+            }
+        }
+        i = first;
+        *st = st1;
+        return false;
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return p.ebnf(defs) + " - \"" + x + "\"";
+    }
+};
+
+template <typename P, typename = typename enable_if<
+    (
+        is_same<typename P::is_parser_type, true_type>::value
+        || is_same<typename P::is_handle_type, true_type>::value
+    ) && is_same<typename P::has_side_effects, false_type>::value
+>::type>
+combinator_except<P> const operator- (P const& p, typename P::result_type const& x) {
     return combinator_except<P>(x, p);
+}
+
+template <typename P, typename = typename enable_if<
+    (
+        is_same<typename P::is_parser_type, true_type>::value
+        || is_same<typename P::is_handle_type, true_type>::value
+    ) && is_same<typename P::has_side_effects, true_type>::value
+>::type>
+combinator_except_side<P> const operator- (P const& p, typename P::result_type const& x) {
+    return combinator_except_side<P>(x, p);
 }
 
 //============================================================================
@@ -1018,6 +1104,7 @@ class parser_handle {
 public:
     using is_parser_type = false_type;
     using is_handle_type = true_type;
+    using has_side_effects = true_type; // have to assume it does.
     using result_type = Synthesize;
     int const rank = 0;
 
@@ -1081,6 +1168,7 @@ class parser_ref {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
     using result_type = typename Parser::result_type;
     int const rank = 0;
     string const name;
@@ -1120,6 +1208,7 @@ template <typename F> class parser_fix {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename parser_type::has_side_effects;
     using result_type = typename parser_type::result_type;
     int const rank = 0;
     string const name;
@@ -1157,6 +1246,7 @@ template <typename Parser> class combinator_discard {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
     using result_type = void;
     int const rank;
 
@@ -1196,6 +1286,7 @@ class parser_log {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
     using result_type = typename Parser::result_type;
     int const rank;
 
@@ -1249,6 +1340,7 @@ class parser_try {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
     using result_type = typename Parser::result_type;
     int const rank;
 
@@ -1262,23 +1354,23 @@ public:
         Inherit* st = nullptr
     ) const {
         Iterator const first = i;
-        Inherit inh;
-        result_type syn;
-        if (st != nullptr) {
-            inh = *st;
-        }
-        if (result != nullptr) {
-            syn = *result;
-        }
-        if (p(i, r, result, st)) {
-            return true;
-        } 
-        i = first;
-        if (st != nullptr) {
-            *st = inh;
-        }
-        if (result != nullptr) {
-            *result = syn;
+        if (has_side_effects::value) {
+            Inherit inh;
+            if (st != nullptr) {
+                inh = *st;
+            }
+            if (p(i, r, result, st)) {
+                return true;
+            } 
+            i = first;
+            if (st != nullptr) {
+                *st = inh;
+            }
+        } else {
+            if (p(i, r, result, st)) {
+                return true;
+            } 
+            i = first;
         }
         return false;
     }
@@ -1305,6 +1397,7 @@ class parser_strict {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
     using result_type = typename Parser::result_type;
     int const rank;
 
@@ -1345,6 +1438,7 @@ class parser_name {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
     using result_type = typename Parser::result_type;
     int const rank;
     string const name;
@@ -1384,6 +1478,7 @@ class parser_def {
 public:
     using is_parser_type = true_type;
     using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
     using result_type = typename Parser::result_type;
     int const rank;
     string const name;
