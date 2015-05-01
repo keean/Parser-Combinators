@@ -65,6 +65,10 @@ struct type_struct : public type_expression {
     }
 };
 
+using test = enable_if<is_compatible<type_expression, type_struct>::value, bool>::type;
+
+test a;
+
 ostream& operator<< (ostream& out, type_expression* exp) {
     exp->operator<<(out);
     return out;
@@ -171,15 +175,8 @@ struct return_variable {
 
 struct return_args {
     return_args() {}
-    void operator() (vector<type_expression*>* res, int n, type_variable* var, type_struct* str, parser_state*) const {
-        switch(n) {
-            case 0:
-                res->push_back(var);
-                break;
-            case 1:
-                res->push_back(str);
-                break;
-        }
+    void operator() (vector<type_expression*>* res, type_expression* t1, parser_state*) const {
+        res->push_back(t1);
     }
 } const return_args;
 
@@ -191,6 +188,67 @@ struct return_struct {
     }
 } const return_struct;
 
+struct return_term {
+    return_term() {}
+    void operator() (type_expression** res, int n, type_variable* v, type_struct *s, parser_state *st) const {
+        switch (n) {
+            case 0:
+                *res = v;
+                break;
+            case 1:
+                *res = s;
+                break;
+        }
+    }
+} const return_term;
+
+struct return_oper {
+    return_oper() {}
+    void operator() (type_expression** res, type_expression* t1, pair<string, type_expression*> const& t2, parser_state* st) const {
+        if (!t2.first.empty()) {
+            name_t o = st->get_name(t2.first);
+            vector<type_expression*> a {t1, t2.second};
+            *res = new type_struct(o, a);
+        } else {
+            *res = t1;
+        }
+    }
+} const return_oper;
+
+struct return_var_op {
+    return_var_op() {}
+    void operator() (type_struct** res, type_variable* t1, string const& oper, type_expression* t2, parser_state* st) const {
+        name_t o = st->get_name(oper);
+        vector<type_expression*> a {t1, t2};
+        *res = new type_struct(o, a);
+    }
+} const return_var_op;
+
+struct return_oper_term {
+    return_oper_term() {}
+    void operator() (
+        pair<string, type_expression*>* res,
+        string const& oper,
+        type_expression* term,
+        parser_state* st
+    ) const {
+        *res = make_pair(oper, term);
+    }
+} const return_oper_term;    
+
+struct return_st_op {
+    return_st_op() {}
+    void operator() (type_struct** res, type_struct* t1, pair<string, type_expression*> const& t2, parser_state* st) const {
+        if (!t2.first.empty()) {
+            name_t o = st->get_name(t2.first);
+            vector<type_expression*> a {t1, t2.second};
+            *res = new type_struct(o, a);
+        } else {
+            *res = t1;
+        }
+    }
+} const return_st_op;
+ 
 struct return_head {
     return_head() {}
     void operator() (type_struct** res, type_struct* str, parser_state* st) const {
@@ -245,23 +303,50 @@ auto const var_tok = tokenise(accept(is_upper || is_char('_')) && many(accept(is
 auto const open_tok = tokenise(accept(is_char('(')));
 auto const close_tok = tokenise(accept(is_char(')')));
 auto const sep_tok = tokenise(accept(is_char(',')));
-auto const impl_tok = tokenise(accept_str(":-"));
 auto const end_tok = tokenise(accept(is_char('.')));
+auto const impl_tok = tokenise(accept_str(":-"));
+auto const oper_tok = tokenise(some(accept(
+        is_punct - (is_char('_')  || is_char('(')  || is_char(')')  || is_char(','))
+    )) - "." - ":-");
 auto const comment_tok = tokenise(accept(is_char('#')) && many(accept(is_print)) && accept(is_eol));
 
 // the "definitions" help clean up the EBNF output in error reports
 auto const variable = define("variable", all(return_variable, var_tok));
 auto const atom = define("atom", atom_tok);
+auto const oper = define("operator", oper_tok);
 
-// a function from a parser to a parser.
-pstream_handle<type_struct*, parser_state> recursive_structure(pstream_handle<type_struct*, parser_state> const s) {
-    return all(return_struct, atom, option(discard(open_tok)
-        && sep_by(any(return_args, variable, s), discard(sep_tok))
-        && discard(close_tok)));
+template <typename T> using pshand = pstream_handle<T, parser_state>;
+
+// higher order parsers.
+
+// parse atom and list of arguments.
+pshand<type_struct*> recursive_struct(pshand<type_expression*> const t) {
+    return define("struct", all(return_struct,
+        atom,
+        option(discard(open_tok) && sep_by(all(return_args, t), sep_tok) && discard(close_tok))
+    ));
 }
 
-// tie the recursive knot.
-auto const structure = fix("struct", recursive_structure);
+// parse a term that is either a variable or an atom/struct
+pshand<type_expression*> recursive_term(pshand<type_expression*> const t) {
+    return define("term", any(return_term,
+        variable,
+        recursive_struct(t))
+    );
+}
+
+// parse a term, followed by optional operator and term.
+pshand<type_expression*> recursive_oper(pshand<type_expression*> const t) {
+    return all(return_oper,
+        recursive_term(t),
+        option(all(return_oper_term, attempt(oper), t))
+    );
+}
+
+auto const op = fix("op-list", recursive_oper);
+
+auto const structure = define("op-struct", all(return_var_op, variable, oper, op)
+    || all(return_st_op, recursive_struct(op), option(all(return_oper_term, attempt(oper), op))));
 
 auto const comment = define("comment", discard(comment_tok));
 auto const goals = define("goals", discard(impl_tok)
