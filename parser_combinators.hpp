@@ -952,7 +952,6 @@ combinator_many<P> const many(P const& p) {
 //----------------------------------------------------------------------------
 // Exception parser
 
-// use when Parser p does not modify inherited attributes.
 template <typename Parser> class combinator_except {
     Parser const p;
     typename Parser::result_type const x;
@@ -973,7 +972,6 @@ public:
         result_type *result = nullptr,
         Inherit* st = nullptr
     ) const {
-        Iterator first = i;
         result_type tmp;
         if (p(i, r, &tmp, st)) {
             if (x != tmp) {
@@ -983,49 +981,6 @@ public:
                 return true;
             }
         }
-        i = first;
-        return false;
-    }
-
-    string ebnf(unique_defs* defs = nullptr) const {
-        return p.ebnf(defs) + " - \"" + x + "\"";
-    }
-};
-
-// use when Parser p modifies inherited attributes.
-template <typename Parser> class combinator_except_side {
-    Parser const p;
-    typename Parser::result_type const x;
-
-public:
-    using is_parser_type = true_type;
-    using is_handle_type = false_type;
-    using has_side_effects = typename Parser::has_side_effects;
-    using result_type = typename Parser::result_type;
-    int const rank = 0;
-
-    combinator_except_side(typename Parser::result_type const& x, Parser const& p) : p(p), x(x) {}
-
-    template <typename Iterator, typename Range, typename Inherit = default_inherited> 
-    bool operator() (
-        Iterator &i,
-        Range const &r,
-        result_type *result = nullptr,
-        Inherit* st = nullptr
-    ) const {
-        Iterator first = i;
-        Inherit const st1 = *st;
-        result_type tmp;
-        if (p(i, r, &tmp, st)) {
-            if (x != tmp) {
-                if (result != nullptr) {
-                    *result = tmp;
-                }
-                return true;
-            }
-        }
-        i = first;
-        *st = st1;
         return false;
     }
 
@@ -1035,23 +990,11 @@ public:
 };
 
 template <typename P, typename = typename enable_if<
-    (
-        is_same<typename P::is_parser_type, true_type>::value
-        || is_same<typename P::is_handle_type, true_type>::value
-    ) && is_same<typename P::has_side_effects, false_type>::value
->::type>
+    is_same<typename P::is_parser_type, true_type>::value
+    || is_same<typename P::is_handle_type, true_type>::value
+    >::type>
 combinator_except<P> const operator- (P const& p, typename P::result_type const& x) {
     return combinator_except<P>(x, p);
-}
-
-template <typename P, typename = typename enable_if<
-    (
-        is_same<typename P::is_parser_type, true_type>::value
-        || is_same<typename P::is_handle_type, true_type>::value
-    ) && is_same<typename P::has_side_effects, true_type>::value
->::type>
-combinator_except_side<P> const operator- (P const& p, typename P::result_type const& x) {
-    return combinator_except_side<P>(x, p);
 }
 
 //============================================================================
@@ -1354,23 +1297,49 @@ public:
         Inherit* st = nullptr
     ) const {
         Iterator const first = i;
-        if (has_side_effects::value) {
-            Inherit inh;
-            if (st != nullptr) {
-                inh = *st;
-            }
-            if (p(i, r, result, st)) {
-                return true;
-            } 
-            i = first;
-            if (st != nullptr) {
-                *st = inh;
-            }
-        } else {
-            if (p(i, r, result, st)) {
-                return true;
-            } 
-            i = first;
+        if (p(i, r, result, st)) {
+            return true;
+        } 
+        i = first;
+        return false;
+    }
+
+    string ebnf(unique_defs* defs = nullptr) const {
+        return p.ebnf(defs);
+    }
+};
+
+template <typename Parser>
+class parser_try_side {
+    Parser const p;
+
+public:
+    using is_parser_type = true_type;
+    using is_handle_type = false_type;
+    using has_side_effects = typename Parser::has_side_effects;
+    using result_type = typename Parser::result_type;
+    int const rank;
+
+    explicit parser_try_side(Parser const& q) : p(q), rank(q.rank) {}
+
+    template <typename Iterator, typename Range, typename Inherit = default_inherited>
+    bool operator() (
+        Iterator &i,
+        Range const &r,
+        result_type *result = nullptr,
+        Inherit* st = nullptr
+    ) const {
+        Iterator const first = i;
+        Inherit inh;
+        if (st != nullptr) {
+            inh = *st;
+        }
+        if (p(i, r, result, st)) {
+            return true;
+        } 
+        i = first;
+        if (st != nullptr) {
+            *st = inh;
         }
         return false;
     }
@@ -1380,10 +1349,24 @@ public:
     }
 };
 
-template <typename P, typename = typename enable_if<is_same<typename P::is_parser_type, true_type>::value
-    || is_same<typename P::is_handle_type, true_type>::value>::type>
+template <typename P, typename = typename enable_if<
+    (
+        is_same<typename P::is_parser_type, true_type>::value
+        || is_same<typename P::is_handle_type, true_type>::value
+    ) && is_same<typename P::has_side_effects, false_type>::value
+>::type>
 parser_try<P> attempt(P const& p) {
     return parser_try<P>(p);
+}
+
+template <typename P, typename = typename enable_if<
+    (
+        is_same<typename P::is_parser_type, true_type>::value
+        || is_same<typename P::is_handle_type, true_type>::value
+    ) && is_same<typename P::has_side_effects, true_type>::value
+>::type>
+parser_try_side<P> attempt(P const& p) {
+    return parser_try_side<P>(p);
 }
 
 //----------------------------------------------------------------------------
