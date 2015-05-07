@@ -121,6 +121,20 @@ ostream& operator<< (ostream& out, clause* cls) {
     return out;
 }
 
+struct program {
+    set<string> names;
+    vector<struct clause*> db;
+};
+
+ostream& operator<< (ostream& out, program const& p) {
+    int i = 1, tab = to_string(p.db.size()).size();
+    for (auto  j = p.db.cbegin(); j != p.db.cend(); ++i, ++j) {
+        string pad(" ", tab - to_string(i).size());
+        out << pad << i << ". " << *j;
+    }
+    return out;
+};
+
 //----------------------------------------------------------------------------
 // Parser State
 //
@@ -132,15 +146,15 @@ ostream& operator<< (ostream& out, clause* cls) {
 
 using var_t = map<string const*, type_variable*>::const_iterator;
 
-struct program {
-    set<string> names; // global name table
+struct inherited_attributes {
+    set<string>& names; // global name table
     map<string const*, type_variable*> variables; 
     set<type_variable*> repeated;
     set<type_variable*> repeated_in_goal;
 
-    program() {};
-    program(program const&) = delete;
-    program& operator= (program const&) = delete;
+    //inherited_attributes() {};
+    inherited_attributes(inherited_attributes const&) = delete;
+    inherited_attributes& operator= (inherited_attributes const&) = delete;
 
     name_t get_name(string const& name) {
         name_t const n = names.find(name);
@@ -150,6 +164,8 @@ struct program {
             return n;
         }
     }
+
+    inherited_attributes(set<string>& ns) : names(ns) {}
 };
 
 //----------------------------------------------------------------------------
@@ -161,7 +177,7 @@ struct program {
 
 struct return_variable {
     return_variable() {}
-    void operator() (type_variable** res, string const& name, program* st) const {
+    void operator() (type_variable** res, string const& name, inherited_attributes* st) const {
         name_t const n = st->get_name(name);
         var_t i = st->variables.find(&(*n));
         if (i == st->variables.end()) {
@@ -177,22 +193,21 @@ struct return_variable {
 
 struct return_args {
     return_args() {}
-    void operator() (vector<type_expression*>* res, type_expression* t1, program*) const {
+    void operator() (vector<type_expression*>* res, type_expression* t1, inherited_attributes*) const {
         res->push_back(t1);
     }
 } const return_args;
 
 struct return_struct {
     return_struct() {}
-    void operator() (type_struct** res, string const& name, vector<type_expression*>& args, program* st) const {
-        name_t n = st->get_name(name);
-        *res = new type_struct(n, args);
+    void operator() (type_struct** res, string const& name, vector<type_expression*>& args, inherited_attributes* st) const {
+        *res = new type_struct(st->get_name(name), args);
     }
 } const return_struct;
 
 struct return_term {
     return_term() {}
-    void operator() (type_expression** res, int n, type_variable* v, type_struct *s, program* st) const {
+    void operator() (type_expression** res, int n, type_variable* v, type_struct *s, inherited_attributes* st) const {
         switch (n) {
             case 0:
                 *res = v;
@@ -204,9 +219,9 @@ struct return_term {
     }
 } const return_term;
 
-struct return_oper {
-    return_oper() {}
-    void operator() (type_expression** res, type_expression* t1, pair<string, type_expression*> const& t2, program* st) const {
+struct return_op_exp_exp {
+    return_op_exp_exp() {}
+    void operator() (type_expression** res, type_expression* t1, pair<string, type_expression*> const& t2, inherited_attributes* st) const {
         if (!t2.first.empty()) {
             name_t o = st->get_name(t2.first);
             vector<type_expression*> a {t1, t2.second};
@@ -215,16 +230,16 @@ struct return_oper {
             *res = t1;
         }
     }
-} const return_oper;
+} const return_op_exp_exp;
 
-struct return_var_op {
-    return_var_op() {}
-    void operator() (type_struct** res, type_variable* t1, string const& oper, type_expression* t2, program* st) const {
+struct return_op_var_exp {
+    return_op_var_exp() {}
+    void operator() (type_struct** res, type_variable* t1, string const& oper, type_expression* t2, inherited_attributes* st) const {
         name_t o = st->get_name(oper);
         vector<type_expression*> a {t1, t2};
         *res = new type_struct(o, a);
     }
-} const return_var_op;
+} const return_op_var_exp;
 
 struct return_oper_term {
     return_oper_term() {}
@@ -232,15 +247,15 @@ struct return_oper_term {
         pair<string, type_expression*>* res,
         string const& oper,
         type_expression* term,
-        program* st
+        inherited_attributes* st
     ) const {
         *res = make_pair(oper, term);
     }
 } const return_oper_term;    
 
-struct return_st_op {
-    return_st_op() {}
-    void operator() (type_struct** res, type_struct* t1, pair<string, type_expression*> const& t2, program* st) const {
+struct return_op_stc_exp {
+    return_op_stc_exp() {}
+    void operator() (type_struct** res, type_struct* t1, pair<string, type_expression*> const& t2, inherited_attributes* st) const {
         if (!t2.first.empty()) {
             name_t o = st->get_name(t2.first);
             vector<type_expression*> a {t1, t2.second};
@@ -249,11 +264,11 @@ struct return_st_op {
             *res = t1;
         }
     }
-} const return_st_op;
+} const return_op_stc_exp;
  
 struct return_head {
     return_head() {}
-    void operator() (type_struct** res, type_struct* str, program* st) const {
+    void operator() (type_struct** res, type_struct* str, inherited_attributes* st) const {
         *res = str;
         st->repeated_in_goal = st->repeated;
     }
@@ -261,14 +276,14 @@ struct return_head {
 
 struct return_goal {
     return_goal() {}
-    void operator() (vector<type_struct*>* res, type_struct* impl, program*) const {
+    void operator() (vector<type_struct*>* res, type_struct* impl, inherited_attributes*) const {
         res->push_back(impl);
     }
 } const return_goal;
 
 struct return_clause {
     return_clause() {}
-    void operator() (vector<clause*>* res, type_struct* head, vector<type_struct*>& impl, program* st) const {
+    void operator() (vector<clause*>* res, type_struct* head, vector<type_struct*>& impl, inherited_attributes* st) const {
         res->push_back(new clause(head, impl, st->repeated_in_goal));
         st->variables.clear();
         st->repeated.clear();
@@ -278,7 +293,7 @@ struct return_clause {
 
 struct return_goals {
     return_goals() {}
-    void operator() (vector<clause*>* res, vector<type_struct*>& impl, program* st) const {
+    void operator() (vector<clause*>* res, vector<type_struct*>& impl, inherited_attributes* st) const {
         vector<type_expression*> vars;
         for (auto v : st->variables) {
             vars.push_back(v.second);
@@ -317,7 +332,7 @@ auto const variable = define("variable", all(return_variable, var_tok));
 auto const atom = define("atom", atom_tok);
 auto const oper = define("operator", oper_tok);
 
-template <typename T> using pshand = pstream_handle<T, program>;
+template <typename T> using pshand = pstream_handle<T, inherited_attributes>;
 
 // higher order parsers.
 
@@ -339,7 +354,7 @@ pshand<type_expression*> recursive_term(pshand<type_expression*> const t) {
 
 // parse a term, followed by optional operator and term.
 pshand<type_expression*> recursive_oper(pshand<type_expression*> const t) {
-    return all(return_oper,
+    return all(return_op_exp_exp,
         recursive_term(t),
         option(all(return_oper_term, attempt(oper), t))
     );
@@ -347,8 +362,8 @@ pshand<type_expression*> recursive_oper(pshand<type_expression*> const t) {
 
 auto const op = fix("op-list", recursive_oper);
 
-auto const structure = define("op-struct", all(return_var_op, variable, oper, op)
-    || all(return_st_op, recursive_struct(op), option(all(return_oper_term, attempt(oper), op))));
+auto const structure = define("op-struct", all(return_op_var_exp, variable, oper, op)
+    || all(return_op_stc_exp, recursive_struct(op), option(all(return_oper_term, attempt(oper), op))));
 
 auto const comment = define("comment", discard(comment_tok));
 auto const goals = define("goals", discard(impl_tok)

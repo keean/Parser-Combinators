@@ -5,20 +5,19 @@ using namespace std;
 struct expression_parser;
 
 template <typename Range>
-int parse(Range const &r) {
+int parse(Range const &r, program& prog) {
     decltype(parser)::result_type a {}; 
     typename Range::iterator i = r.first;
-    program st;
+    inherited_attributes st(prog.names);
 
     profile<expression_parser> p;
-    if (parser(i, r, &a, &st)) {
+
+    if (parser(i, r, &prog.db, &st)) {
         cout << "OK" << endl;
     } else {
         cout << "FAIL" << endl;
     }
 
-    cout << a << endl;
-    
     return i - r.first;
 }
 
@@ -35,9 +34,11 @@ int main(int const argc, char const *argv[]) {
             profile<expression_parser>::reset();
             stream_range in(argv[i]);
             cout << argv[i] << endl;
-            int const chars_read = parse(in);
-            double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<expression_parser>::report());
-            cout << "parsed: " << mb_per_s << "MB/s" << endl;
+            program prog;
+            int const chars_read = parse(in, prog);
+            cout << prog << endl;
+            //double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<expression_parser>::report());
+            //cout << "parsed: " << mb_per_s << "MB/s" << endl;
         }
     }
 }
