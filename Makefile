@@ -23,7 +23,7 @@ stream_expression: example_expression.cpp templateio.hpp parser_combinators.hpp 
 vector_expression: example_expression.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp File-Vector/file_vector.hpp
 	${CXX} ${CFLAGS} -DUSE_MMAP -o vector_expression example_expression.cpp
 
-prolog: prolog.cpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp File-Vector/file_vector.hpp
+prolog: prolog.cpp prolog.hpp templateio.hpp parser_combinators.hpp function_traits.hpp profile.hpp File-Vector/file_vector.hpp
 	${CXX} ${CFLAGS} -DUSE_MMAP -o prolog prolog.cpp
 
 mkexp: mkexp.cpp
