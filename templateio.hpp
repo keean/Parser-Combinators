@@ -9,6 +9,7 @@
 #include <iostream>
 #include <vector>
 #include <tuple>
+#include <map>
 
 using namespace std;
 
@@ -41,6 +42,21 @@ template <typename T> ostream& operator<< (ostream& out, vector<T> const& v) {
         cout << *i;
         typename vector<T>::const_iterator j = i;
         if (++j != v.end()) {
+            cout << ", ";
+        }
+    }
+    return out << "]";
+}
+
+//----------------------------------------------------------------------------
+// iostream output for maps.
+
+template <typename S, typename T> ostream& operator<< (ostream& out, map<S, T> const& m) {
+    out << "{";
+    for (typename map<S, T>::const_iterator i = m.begin(); i != m.end(); ++i) {
+        cout << i->first << " = " << i->second;
+        typename map<S, T>::const_iterator j = i;
+        if (++j != m.end()) {
             cout << ", ";
         }
     }
