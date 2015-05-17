@@ -33,6 +33,10 @@ template <typename... T> ostream& operator<< (ostream& out, tuple<T...> const& t
     return out << '>';
 }
 
+template <typename S, typename T> ostream& operator<< (ostream& out, pair<S, T> const& p) {
+    return out << '(' << p.first << ", " << p.second << ')';
+}
+
 //----------------------------------------------------------------------------
 // iostream output for vectors.
 
@@ -60,7 +64,19 @@ template <typename S, typename T> ostream& operator<< (ostream& out, map<S, T> c
             cout << ", ";
         }
     }
-    return out << "]";
+    return out << "}";
+}
+
+template <typename S, typename T> ostream& operator<< (ostream& out, multimap<S, T> const& m) {
+    out << "{";
+    for (typename multimap<S, T>::const_iterator i = m.begin(); i != m.end(); ++i) {
+        cout << i->first << " = " << i->second;
+        typename multimap<S, T>::const_iterator j = i;
+        if (++j != m.end()) {
+            cout << ", ";
+        }
+    }
+    return out << "}";
 }
 
 #endif // TEMPLATEIO_HPP
