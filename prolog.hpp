@@ -1,8 +1,9 @@
+#include <string>
+#include <sstream>
 #include <iostream>
 #include <vector>
 #include <set>
 #include <map>
-#include <sstream>
 
 #include "stream_iterator.hpp"
 #include "templateio.hpp"
@@ -24,57 +25,40 @@ using namespace std;
 // supertype. Clauses combine heads and goals, and keep track of repeated 
 // variables in the head for efficient post-unification cycle checking.
 
-using name_t = set<string>::const_iterator;
+using name_t = std::set<std::string>::const_iterator;
+
+struct name_less {
+    bool operator() (name_t const& x, name_t const& y) const {
+        return &(*x) < &(*y);
+    }
+};
 
 struct type_expression {
-    virtual ostream& operator<< (ostream& out) const = 0;
+    virtual void accept(class expr_visitor* v) = 0;
 };
 
 struct type_variable : public type_expression {
     name_t const name;
-
     type_variable(name_t n) : name(n) {}
-
-    virtual ostream& operator<< (ostream& out) const override {
-        out << *name;
-        return out;
-    }
+    virtual void accept(class expr_visitor* v) override;
 };
 
 struct type_struct : public type_expression {
     name_t const name;
     vector<type_expression*> const args;
-
-    template <typename As>
-    type_struct(name_t n, As&& as) : name(n), args(forward<As>(as)) {}
-
-    ostream& operator<< (ostream& out) const override {
-        if (::ispunct((*name)[0]) && args.size() == 2) {
-            args[0]->operator<<(out);
-            cout << " " << *name << " ";
-            args[1]->operator<<(out);
-        } else {
-            out << *name;
-            if (args.size() > 0) {
-                out << "(";
-                for (auto i = args.cbegin(); i != args.cend(); ++i) {
-                    (*i)->operator<<(out);
-                    auto j = i;
-                    if (++j != args.end()) {
-                        out << ", ";
-                    }
-                }
-                out << ")";
-            }
-        }
-        return out;
-    }
+    template <typename As> type_struct(name_t n, As&& as) : name(n), args(forward<As>(as)) {}
+    virtual void accept(class expr_visitor* v) override;
 };
 
-ostream& operator<< (ostream& out, type_expression* exp) {
-    exp->operator<<(out);
-    return out;
-}
+struct expr_visitor {
+    virtual void visit(type_variable *t) = 0;
+    virtual void visit(type_struct *t) = 0;
+};
+
+void type_variable::accept(expr_visitor* v) {v->visit(this);}
+void type_struct::accept(expr_visitor* v) {v->visit(this);}
+
+
 
 struct clause {
     type_struct* const head;
@@ -86,15 +70,71 @@ struct clause {
         reps(forward<Rs>(rs)) {}
 };
 
+
+
+using db_t = multimap<name_t, struct clause*, name_less>; 
+
+struct program {
+    set<string> names;
+    db_t db;
+};
+
+//----------------------------------------------------------------------------
+// Show Abstract Syntax
+
+class expr_show : public expr_visitor {
+    ostream& out;
+
+    virtual void visit(type_variable* t) override {
+        out << *(t->name);
+    }
+
+    virtual void visit(type_struct* t) override {
+        if (::ispunct((*(t->name))[0]) && t->args.size() == 2) {
+            t->args[0]->accept(this);
+            cout << " " << *(t->name) << " ";
+            t->args[1]->accept(this);
+        } else {
+            out << *(t->name);
+            if (t->args.size() > 0) {
+                out << "(";
+                for (auto i = t->args.cbegin(); i != t->args.cend(); ++i) {
+                    (*i)->accept(this);
+                    auto j = i;
+                    if (++j != t->args.end()) {
+                        out << ", ";
+                    }
+                }
+                out << ")";
+            }
+        }
+    }
+
+public:
+    expr_show(ostream& out) : out(out) {}
+
+    void operator() (type_expression* t) {
+        t->accept(this);
+    }
+};
+
+ostream& operator<< (ostream& out, type_expression* exp) {
+    expr_show eshow(out);
+    eshow(exp);
+    return out;
+}
+
 ostream& operator<< (ostream& out, clause* cls) {
-    cls->head->operator<<(out);
+    expr_show eshow(out);
+
+    eshow(cls->head);
     auto f = cls->impl.cbegin();
     auto const l = cls->impl.cend();
     if (f != l) {
         out << " :-" << endl;
         for (auto i = f; i != l; ++i) {
             out << "\t";
-            (*i)->operator<<(out);
+            eshow(*i);
             auto j = i;
             if (++j != l) {
                 out << "," << endl;
@@ -108,7 +148,7 @@ ostream& operator<< (ostream& out, clause* cls) {
     if (g != m) {
         out << " [";
         for (auto i = g; i != m; ++i) {
-            (*i)->operator<<(out);
+            eshow(*i);
             auto j = i;
             if (++j != m) {
                 out << ", ";
@@ -121,16 +161,11 @@ ostream& operator<< (ostream& out, clause* cls) {
     return out;
 }
 
-struct program {
-    set<string> names;
-    vector<struct clause*> db;
-};
-
 ostream& operator<< (ostream& out, program const& p) {
     int i = 1, tab = to_string(p.db.size()).size();
-    for (auto  j = p.db.cbegin(); j != p.db.cend(); ++i, ++j) {
+    for (auto j = p.db.cbegin(); j != p.db.cend(); ++i, ++j) {
         string pad(" ", tab - to_string(i).size());
-        out << pad << i << ". " << *j;
+        out << pad << i << ". " << j->second;
     }
     return out;
 };
@@ -144,11 +179,11 @@ ostream& operator<< (ostream& out, program const& p) {
 // performance) or a safety measure to make sure we deal with copying if we 
 // want backtracking.
 
-using var_t = map<string const*, type_variable*>::const_iterator;
+using var_t = map<name_t, type_variable*>::const_iterator;
 
 struct inherited_attributes {
     set<string>& names; // global name table
-    map<string const*, type_variable*> variables; 
+    map<name_t, type_variable*, name_less> variables; 
     set<type_variable*> repeated;
     set<type_variable*> repeated_in_goal;
 
@@ -179,10 +214,10 @@ struct return_variable {
     return_variable() {}
     void operator() (type_variable** res, string const& name, inherited_attributes* st) const {
         name_t const n = st->get_name(name);
-        var_t i = st->variables.find(&(*n));
+        var_t i = st->variables.find(n);
         if (i == st->variables.end()) {
             type_variable* const var = new type_variable(n);
-            st->variables.insert(make_pair(&(*n), var));
+            st->variables.insert(make_pair(n, var));
             *res = var;
         } else {
             st->repeated.insert(i->second);
@@ -283,8 +318,8 @@ struct return_goal {
 
 struct return_clause {
     return_clause() {}
-    void operator() (vector<clause*>* res, type_struct* head, vector<type_struct*>& impl, inherited_attributes* st) const {
-        res->push_back(new clause(head, impl, st->repeated_in_goal));
+    void operator() (db_t* res, type_struct* head, vector<type_struct*>& impl, inherited_attributes* st) const {
+        res->emplace(head->name, new clause(head, impl, st->repeated_in_goal));
         st->variables.clear();
         st->repeated.clear();
         st->repeated_in_goal.clear();
@@ -293,14 +328,17 @@ struct return_clause {
 
 struct return_goals {
     return_goals() {}
-    void operator() (vector<clause*>* res, vector<type_struct*>& impl, inherited_attributes* st) const {
+    void operator() (db_t* res, vector<type_struct*>& impl, inherited_attributes* st) const {
         vector<type_expression*> vars;
         for (auto v : st->variables) {
             vars.push_back(v.second);
         }
-        res->push_back(new clause(
-            new type_struct(st->get_name("goal"), vars), impl, set<type_variable*> {}
-        ));
+
+        name_t n = st->get_name("goal");
+
+        res->emplace(make_pair(n, new clause(
+            new type_struct(n, vars), impl, set<type_variable*> {}
+        )));
 
         st->variables.clear();
         st->repeated.clear();
