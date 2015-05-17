@@ -37,8 +37,8 @@ int main(int const argc, char const *argv[]) {
             program prog;
             int const chars_read = parse(in, prog);
             cout << prog << endl;
-            //double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<expression_parser>::report());
-            //cout << "parsed: " << mb_per_s << "MB/s" << endl;
+            double const mb_per_s = static_cast<double>(chars_read) / static_cast<double>(profile<expression_parser>::report());
+            cout << "parsed: " << mb_per_s << "MB/s" << endl;
         }
     }
 }
