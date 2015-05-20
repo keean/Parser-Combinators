@@ -79,8 +79,10 @@ private:
         reps(forward<Rs>(rs)) {}
 };
 
-struct program {
+class program {
     vector<unique_ptr<managed>> region;
+
+public:
     set<string> atoms;
     multimap<atom_t, struct clause*, atom_less> db;
     vector<clause*> goals;
