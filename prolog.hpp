@@ -51,12 +51,12 @@ private:
 };
 
 struct compound : public term {
-    atom_t const atom;
+    atom_t const functor;
     vector<term*> const args;
     virtual void accept(class term_visitor* v) override;
 private:
     friend class program;
-    template <typename As> compound(atom_t n, As&& as) : atom(n), args(forward<As>(as)) {}
+    template <typename As> compound(atom_t f, As&& as) : functor(f), args(forward<As>(as)) {}
 };
 
 struct term_visitor {
@@ -118,12 +118,12 @@ class expr_show : public term_visitor {
     }
 
     virtual void visit(compound* t) override {
-        if (::ispunct((*(t->atom))[0]) && t->args.size() == 2) {
+        if (::ispunct((*(t->functor))[0]) && t->args.size() == 2) {
             t->args[0]->accept(this);
-            cout << " " << *(t->atom) << " ";
+            cout << " " << *(t->functor) << " ";
             t->args[1]->accept(this);
         } else {
-            out << *(t->atom);
+            out << *(t->functor);
             if (t->args.size() > 0) {
                 out << "(";
                 for (auto i = t->args.cbegin(); i != t->args.cend(); ++i) {
@@ -356,7 +356,7 @@ struct return_clause {
         vector<compound*>& impl,
         inherited_attributes* st
     ) const {
-        st->prog.db.emplace(head->atom, st->prog.new_clause(head, impl, st->repeated_in_goal));
+        st->prog.db.emplace(head->functor, st->prog.new_clause(head, impl, st->repeated_in_goal));
         st->variables.clear();
         st->repeated.clear();
         st->repeated_in_goal.clear();
